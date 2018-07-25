@@ -1,0 +1,870 @@
+<html>
+<head>
+<title>CosmosNine.</title>
+<link rel="stylesheet" type="text/css" href="CosmosSteelo.css" />
+<script src="jquery.js"></script> 
+<script type="text/javascript">
+var isIE=document.all;
+//global counter - used to keep track of bots moving
+var globalCounter=0;
+//mouse movement
+var xOrig=0;
+var yOrig=0;
+
+//browserSize
+var widthOfWindow;	//for window dimensions - width
+var heightOfWindow;	//for window dimensions - height
+
+//global variables
+var mPWidth=0;
+var numRows=0;
+var numBoxX=50; 		//for  generateMatrix()
+var botCounter=0;		//for addBot()
+var botArmy=new Array();
+
+//for setting up randomly placed people
+var RNOP;		//Random Number of People
+
+//autonomously moving a person
+var animationTimer;
+
+//different types of movements
+var peepsMove=new Array();
+var moveInterval=new Array();
+//movement1()
+var move1=0;
+//movement2
+var move2=0;
+
+//virtual grid
+var vGrid;
+var squareLength;
+//assignLeadersToGridBox
+var allStrRandBox="";
+
+//peopleMovements()
+var globalTimer=0;
+
+//data analysis
+//for function intiateTableArray()
+var header;
+var tableArray;
+
+function browseAdj(x)
+{
+var object;
+	 if(document.getElementById){	//Mozilla
+                  object=document.getElementById(x);
+            }else if(document.all){		//Internet Explorer
+                  object=document.all[x];
+            }else if(document.layers){		//Netscape
+                  object=document.layers[x];
+            }          
+return object;
+}
+
+function browserSize() {
+	  var myWidth = 0, myHeight = 0;
+	  if( typeof( window.innerWidth ) == 'number' ) {   //Non-IE
+	    myWidth = window.innerWidth;
+	    myHeight = window.innerHeight;
+	    myXScroll = window.pageXOffset;
+	    myYScroll = window.pageYOffset;
+	  } else if(document.documentElement && ( document.documentElement.clientWidth || document.documentElement.clientHeight ) ) {
+	    //IE 6+ in 'standards compliant mode'
+	    myWidth = document.documentElement.clientWidth;
+	    myHeight = document.documentElement.clientHeight;
+	    myXScroll = document.documentElement.scrollLeft;
+	    myYScroll = document.documentElement.scrollTop;
+	  } else if( document.body && ( document.body.clientWidth || document.body.clientHeight ) ) {  //IE 4 compatible
+	    myWidth = document.body.clientWidth;
+	    myHeight = document.body.clientHeight;
+	    myXScroll = document.body.scrollLeft;
+	    myYScroll = document.body.scrollTop;
+	  }
+	  widthOfWindow=myWidth-100;
+	  heightOfWindow=myHeight-100;
+	  currentXScroll=myXScroll;
+	  currentYScroll=myYScroll;
+	  //window.alert( 'Width = ' + myWidth );
+	  //window.alert( 'Height = ' + myHeight );  
+	}
+
+
+function mouseOrig(x)
+{
+	if (browseAdj(x))
+	{
+		xOrig = window.event.x;
+		yOrig = window.event.y;		
+	}
+	else //works for Netscape & Mozilla
+	{
+		xOrig = x.pageX;
+		yOrig = x.pageY;	
+	}
+}
+
+//FROM: http://stackoverflow.com/questions/1173194/select-all-div-text-with-single-mouse-click
+//SEE ALSO: http://www.quirksmode.org/dom/range_intro.html
+function selectText(containerid) {
+    if (document.selection) {
+        var range = document.body.createTextRange();
+        range.moveToElementText(document.getElementById(containerid));
+        range.select();
+    } else if (window.getSelection) {
+        var range = document.createRange();
+        range.selectNode(document.getElementById(containerid));
+        window.getSelection().addRange(range);
+    }
+}
+
+function retrieveNodeArray(NameOfNode,NodeTrait,SpecificTrait)
+{
+	//NameOfNode - access the name attribute of the node
+	//NodeTrait - the attribute of interest for the node (getAttribute)
+	//SpecificTrait - the value the NodeTrait should match
+	//create array
+	var i;
+	var k=0;
+	var ArrayOfNodes=new Array();
+	var e=new Array();
+	var e=document.getElementsByName(NameOfNode);
+	//for(i in e)
+	for(i=0;i<e.length;i++)
+	{
+		if(e[i].getAttribute(NodeTrait)==SpecificTrait)
+		{
+			ArrayOfNodes[k]=e[i];
+			k++;			
+		}
+	}
+	return ArrayOfNodes;
+}
+
+function randomColorGenerator()
+{
+	var colorString;
+	var colorR=Math.floor(Math.random()*255);
+	var colorB=Math.floor(Math.random()*255);
+	var colorG=Math.floor(Math.random()*255);
+	colorString="rgb("+colorR+","+colorB+","+colorG+")";
+	return colorString;
+}
+
+//FUNCTION Menu
+function displayControlPanel()
+{
+	if(browseAdj("controlPanel").style.display=="none")
+	{browseAdj("controlPanel").style.display="block";}
+	else if(browseAdj("controlPanel").style.display=="block")
+	{browseAdj("controlPanel").style.display="none";}
+}
+
+function closePopUps()
+{
+	browseAdj("popUpArea").innerHTML="";
+}
+
+//COSMOS.NINE. Functions start
+function generateMatrix()
+{
+	var matrixArea,mPPosID,PDisplayPosID,TDposID,TDdisplayID,mPBotID;
+	//get # of boxes in X & Y axis
+	var mPCount=0;
+	//interactArea - area where the user can interact with the grid	
+	interactArea="<table id='interactMatrix' style='position:absolute;left:0;top:0;z-index:5;' border='0' cellspacing='1' cellpadding='0'>";
+	//displayArea - area displaying the physical grid, this is just for the user's convenience
+	displayArea="<table id='displayMatrix' style='position:absolute;left:0;top:0;z-index:1;' border='0' cellspacing='1' cellpadding='0'>";
+	for(y=0;y<numRows;y++)
+	{
+		interactArea+="<tr>";
+		//matrixArea+="<tr>";
+		displayArea+="<tr>";
+		for(x=0;x<numBoxX;x++)
+		{
+			mPPosID="gridPos"+mPCount;
+			mPDisplayPosID="displayPos"+mPCount;
+			TDposID="TD"+mPPosID;
+			TDdisplayID="TD"+mPDisplayPosID;
+			interactArea+="<td id='"+TDposID+"' gridNum="+mPCount+"><div id='"+mPPosID+"' gridNum="+mPCount+" class='macroClearPixel' style='width:"+mPWidth+";height:"+mPWidth+";' onmouseover='cursorLightOn(event)' onmouseout='cursorLightOff(event)' onclick='addBot(event)'>&nbsp;</div></td>";
+			displayArea+="<td id='"+TDdisplayID+"' gridNum="+mPCount+"><div id='"+mPDisplayPosID+"' gridNum="+mPCount+" class='macroPixel' style='width:"+mPWidth+";height:"+mPWidth+";'>&nbsp;</div></td>";
+			mPCount++;
+		}
+		interactArea+="</tr>";
+		displayArea+="</tr>";
+	}
+	interactArea+="</table>";
+	displayArea+="</table>";
+	browseAdj("matrixArea").innerHTML=interactArea;
+	browseAdj("matrixArea").innerHTML+=displayArea;
+
+	//label the edges of the matrix so when the bot moves it know where the edges are
+	matrixLabelEdges();
+}
+
+//labels the edges of the matrixGrid that are the top, bottom, left or right sides
+function matrixLabelEdges()
+{
+	var tileID,tileID2,rightVal;
+	var totalTiles=numBoxX*numRows;
+	//label top edges
+	for(var t=0;t<numBoxX;t++)
+	{
+		tileID="TDdisplayPos"+t;
+		browseAdj(tileID).setAttribute("edgeTop","1");
+	}
+	//label left & right edges
+	for(var l=0;l<totalTiles;l=l+numBoxX)
+	{
+		tileID="TDdisplayPos"+l;
+		rightVal=l+49;
+		tileID2="TDdisplayPos"+rightVal;
+		browseAdj(tileID).setAttribute("edgeLeft","1");
+		browseAdj(tileID2).setAttribute("edgeRight","1");
+	}
+	//label bottom edges
+	var lastRow=totalTiles-numBoxX;
+	for(var b=lastRow;b<totalTiles;b++)
+	{
+		tileID="TDdisplayPos"+b;
+		browseAdj(tileID).setAttribute("edgeBottom","1");
+	}
+}
+
+function centerMatrix()
+{
+	var matrixWidth=browseAdj("displayMatrix").offsetWidth;
+	var matrixHeight=browseAdj("displayMatrix").offsetHeight;
+	var extraSpaceX=Math.abs(widthOfWindow-matrixWidth);
+	var extraSpaceY=Math.abs(heightOfWindow-matrixHeight);
+	//alert("cM1 - W: "+matrixWidth+" | H: "+matrixHeight+"");
+	var matrixPosX=extraSpaceX/2;
+	var matrixPosY=extraSpaceY/2;
+	browseAdj("matrixArea").style.left=matrixPosX;
+	browseAdj("matrixArea").style.top=60;
+	//alert("cM2 - L: "+browseAdj("displayMatrix").style.left+" | H: "+browseAdj("displayMatrix").style.top+"");
+}
+
+function cursorLightOn(e)
+{
+	var mP=isIE ? e.srcElement : e.target;
+	var getColor=randomColorGenerator();
+	mP.style.backgroundColor=getColor;
+}
+
+function cursorLightOff(e)
+{
+	var mP=isIE ? e.srcElement : e.target;
+	mP.style.backgroundColor="transparent";	
+}
+
+//COSMOS.NINE. Functions end
+
+
+//BOT FUNCTIONS BEGIN
+function Bot(botNum,position,func,color,rise,run,recordCollision)
+{
+	this.botNum=botNum;
+	this.position=position;
+	this.func=func;
+	this.color=color;
+	//refers to the slope=rise/run
+	this.rise=parseInt(rise);
+	this.run=parseInt(run);
+	//record bot actions
+	this.recordCollision=recordCollision;
+	//other ideas: frame caption, bot mood
+}
+
+function generateBot(botNum)
+{
+	var botID="bot"+botNum;
+	var getBotColor=botArmy[botNum].color;
+	var builtBot="<div id='"+botID+"' name='bot' botNum='"+botNum+"' class='macroPixel' style='width:"+mPWidth+";height:"+mPWidth+";background-color:"+getBotColor+";'>&nbsp;</div>";
+	return builtBot;
+}
+
+function updateBot(botNum)
+{
+	var botID="bot"+botNum;
+	browseAdj(botID).style.backgroundColor=botArmy[botNum].color;
+}
+
+function retrieveBots()
+{
+	var botInfoStr="";
+	for(var i=0;i<botArmy.length;i++){
+		var getBotID="bot"+i;
+		botInfoStr+="botID: "+botArmy[i].botNum+" | pos: "+browseAdj(getBotID).parentNode.getAttribute("gridNum")+" | color: "+botArmy[i].color+" | rise: "+botArmy[i].rise+" | run: "+botArmy[i].run;
+	}
+	browseAdj("dia").innerHTML=botInfoStr;
+}
+
+//add bot to the macropixel matrix
+function addBot(e)
+{
+	var randRun,randRise;
+	var getLoc=isIE ? e.srcElement : e.target;
+	var mPID=getLoc.getAttribute("id");		//macropixel ID
+	var mPGridPos=getLoc.getAttribute("gridNum");		//macropixel Grid Position
+	var TDdispID="TDdisplayPos"+mPGridPos;
+	//generate random color for bot
+	var botColor=randomColorGenerator();
+	//check if bot already exists in this position. If it already exists, then just modify this existing bot
+	//alert("aB2: "+browseAdj(TDdispID).nodeName+" | "+browseAdj(TDdispID).firstChild.getAttribute("botNum"));
+	if(browseAdj(TDdispID).firstChild.getAttribute("botNum")){
+		var getBotNum=parseInt(browseAdj(TDdispID).firstChild.getAttribute("botNum"));
+		//assign newly generated color to bot object
+		botArmy[getBotNum].color=botColor;
+		var getBotID="bot"+getBotNum;
+		//update color of the new bot
+		updateBot(getBotNum);
+	}
+	//else if no bot exists in this position, then create a new bot in this position
+	else{	
+		var botID="bot"+botCounter;
+		//generate random slopes
+		randRise=Math.ceil(Math.random()*3);
+		negY=Math.random();
+		if(negY>0.5){randRise=randRise*-1;}
+		
+		randRun=Math.ceil(Math.random()*3);
+		negX=Math.random();
+		if(negX>0.5){randRun=randRun*-1;}		
+		//create bot
+		botArmy[botCounter]=new Bot(botCounter,mPGridPos,"",botColor,randRise,randRun,0);
+		var buildABot=generateBot(botCounter);
+		//add bot to specific location
+		browseAdj(TDdispID).innerHTML=buildABot;
+	}
+	//TEST - want to observe changes to the bots
+	retrieveBots();
+	//increment bot # for next bot
+	botCounter++;
+}
+
+//remove bot to the macropixel matrix
+function removeBot()
+{
+	
+}
+
+//BOT FUNCTION ENDS
+
+//ACTION FUNCTION BEGINS
+function startAnimation()
+{animationTimer=setInterval(function(){animateMatrixSpace()},100);		//this should run the animation continually at a set interval
+//setTimeout(function(){animateMatrixSpace()},1000);		//this should run the animation one frame at a time - only for testing
+}
+
+function stopAnimation()
+{clearInterval(animationTimer);}
+
+function animateMatrixSpace()
+{
+	var remainderRun,remainderRise,botRun,botRise;
+	var getBotID,getCurrPosNum,nextY,nextX,nextPos,buildABot,nextBotSpot;
+	var adjSpotX,adjSpotY,adjSpotXY;
+	//access each bot
+	for(i=0;i<botArmy.length;i++)
+	{
+		remainderRun=globalCounter%parseInt(botArmy[i].run);
+		remainderRise=globalCounter%parseInt(botArmy[i].rise);
+		//botArmy[botNum]: refers to the information describing the bot, i.e. rise, run, color
+		//browseAdj(botID): refers to the physical bot that is observed in the matrix
+		getBotID="bot"+i;
+		//get the bot's current position
+		//getCurrPosNum=parseInt(browseAdj(getBotID).parentNode.getAttribute("gridNum"));
+		getCurrPosNum=parseInt(botArmy[i].position);
+		//CHECK FOR EDGE - check if the bot is at an edge. If it is at an edge, then the bot position will change.
+		checkPosEdge2(i);
+		//first see if the bot will move. If the bot won't move, then there is no point running through the rest of the script
+		//it is important to know the direction the bot is going in, therefore use "rise/absolute(rise)" just to find the sign. 		
+		if(remainderRun==0){botRun=parseInt(botArmy[i].run)/Math.abs(parseInt(botArmy[i].run));}
+		else{botRun=0;}
+		if(remainderRise==0){botRise=parseInt(botArmy[i].rise)/Math.abs(parseInt(botArmy[i].rise));}
+		else{botRise=0;}
+		if((botRun!=0) || (botRise!=0))
+		{
+			//generate the bot design for the next position
+			buildABot=generateBot(i);
+			//CHECK FOR COLLISION - see if a bot resides in the nextPosition, then correct botRun & botRise
+			correctForCollision2(i,botRise,botRun);
+			if(botRise!=0){botRise=parseInt(botArmy[i].rise)/Math.abs(parseInt(botArmy[i].rise));}
+			if(botRun!=0){botRun=parseInt(botArmy[i].run)/Math.abs(parseInt(botArmy[i].run));}
+			//recalculate next position
+			nextY=botRise*numBoxX;
+			nextX=botRun;
+			nextPos=getCurrPosNum+nextY+nextX;
+			nextBotSpot="TDdisplayPos"+nextPos;
+			//insert bot into next position
+			browseAdj(nextBotSpot).innerHTML=buildABot;
+			//update position in bot object
+			botArmy[i].position=nextPos;
+			//add a gray box to the bot's previous spot
+			fixOldPos(getCurrPosNum);
+			//Data recording
+			//recordBotSpeeds();
+		}
+	}
+	//global counter to count for bots
+	globalCounter++;
+	browseAdj("counter").innerHTML=globalCounter;
+}
+
+function correctForCollision2(bot1,getRise,getRun)
+{
+	var bot2;
+	var checkChange=0;
+	//NOTE: variables "bot1" & "bot2" are the numbered version of the bot (botNum)
+	//NOTE2: I don't think I need to distinguish whether bot1 is coming from the left, right, top or bottom with respect
+	//to bot 2, but I'm going to do it anyways for the sake of clarity.
+	var bot1Pos=parseInt(botArmy[bot1].position);
+	//find bots in direction of movement
+	//it is important to know the direction the bot is going in, therefore use "rise/absolute(rise)" just to find the sign. 
+	var nextY=parseInt(getRise)*numBoxX;
+	var nextX=parseInt(getRun);
+	var numAdjSpotX=bot1Pos+nextX;
+	adjSpotX="TDdisplayPos"+numAdjSpotX;
+	var numAdjSpotY=bot1Pos+nextY;
+	adjSpotY="TDdisplayPos"+numAdjSpotY;
+	var numAdjSpotXY=bot1Pos+nextX+nextY;
+	adjSpotXY="TDdisplayPos"+numAdjSpotXY;
+	//first see if there is a bot on the top/bottom side
+	if(browseAdj(adjSpotXY).firstChild.getAttribute("botNum") && bot1Pos!=numAdjSpotXY){
+		bot2=parseInt(browseAdj(adjSpotXY).firstChild.getAttribute("botNum"));
+		//DELETE SOON - browseAdj("TESTSTR").innerHTML+="Bot1: "+bot1+" & Pos: "+bot1Pos+" | Bot2: "+bot2+" & AdjPosXY: "+adjSpotXY+" - "+getRise+":"+getRun+"<br/>";
+		collisionChangeSlope(bot1,bot2,1,1);
+		checkChange=1;
+	}
+	else
+	{
+		if(browseAdj(adjSpotX).firstChild.getAttribute("botNum") && bot1Pos!=numAdjSpotX){
+			bot2=parseInt(browseAdj(adjSpotX).firstChild.getAttribute("botNum"));
+			//DELETE SOON - browseAdj("TESTSTR").innerHTML+="Bot1: "+bot1+" & Pos: "+bot1Pos+" | Bot2: "+bot2+" & AdjPosX: "+adjSpotX+" - "+getRise+":"+getRun+"<br/>";
+			collisionChangeSlope(bot1,bot2,1,0);
+			checkChange=1;
+		}
+		if(browseAdj(adjSpotY).firstChild.getAttribute("botNum") && bot1Pos!=numAdjSpotY){
+			bot2=parseInt(browseAdj(adjSpotY).firstChild.getAttribute("botNum"));
+			//DELETE SOON - browseAdj("TESTSTR").innerHTML+="Bot1: "+bot1+" & Pos: "+bot1Pos+" | Bot2: "+bot2+" & AdjPosY: "+adjSpotY+" - "+getRise+":"+getRun+"<br/>";
+			collisionChangeSlope(bot1,bot2,0,1);
+			checkChange=1;
+		}
+	}
+	//double check the edge to make sure the new slope doesn't push the bot off the edge of the matrix
+	if(checkChange>0){checkPosEdge2(bot1);}
+}
+
+function collisionChangeSlope(bot1,bot2,changeX,changeY)
+{
+	//function record collision
+	recordCollisionEvent(bot1,bot2);
+	var multiplyX,multiplyY,temp;
+	if(changeX>0){
+		multiplyX=(botArmy[bot1].run)*(botArmy[bot2].run);
+		//if multiplyX > 0, then both the signs are the same, else if multiplyX < 0 then the signs are different
+		if(multiplyX > 0){
+			temp=botArmy[bot1].run;
+			botArmy[bot1].run=botArmy[bot2].run;
+			botArmy[bot2].run=temp;
+		}
+		else{
+			temp=botArmy[bot1].run;
+			botArmy[bot1].run=botArmy[bot2].run;
+			botArmy[bot2].run=temp;
+		}
+	}
+	if(changeY>0){
+		//check if signs for both bots are the same by multiplying them together
+		multiplyY=(botArmy[bot1].rise)*(botArmy[bot2].rise);
+		//if multiplyY > 0, then both the signs are the same, else if multiplyY < 0 then the signs are different
+		if(multiplyY > 0){
+			temp=botArmy[bot1].rise;
+			botArmy[bot1].rise=botArmy[bot2].rise;
+			botArmy[bot2].rise=temp;
+		}
+		else{
+			temp=botArmy[bot1].rise;
+			botArmy[bot1].rise=botArmy[bot2].rise;
+			botArmy[bot2].rise=temp;
+		}
+	}
+}
+
+function TESTCheckEdge()
+{
+	for(var a=0;a<botArmy.length;a++){
+		alert("TCE"+a+" of "+botArmy.length);
+		checkPosEdge2(a);
+	}
+}
+
+function checkPosEdge2(botNum)
+{
+	//get bot slope
+	var getBotID="bot"+botNum;
+	var getRise=parseInt(botArmy[botNum].rise);
+	var getRun=parseInt(botArmy[botNum].run);
+	//get position of bot
+	var getCurrPosID=botArmy[botNum].position;
+	getCurrPosID="TDdisplayPos"+getCurrPosID;
+	var getCurrPos=browseAdj(getCurrPosID);
+	//it is important to know the direction the bot is going in, therefore use "rise/absolute(rise)" just to find the sign. 
+	var signY=parseInt(botArmy[botNum].rise)/Math.abs(parseInt(botArmy[botNum].rise));
+	var signX=parseInt(botArmy[botNum].run)/Math.abs(parseInt(botArmy[botNum].run));
+	
+	if(getCurrPos.getAttribute("edgeTop")!=null){											//bot must go down
+		if(signY < 0){botArmy[botNum].rise=Math.abs(getRise);}
+	}	
+	else if(getCurrPos.getAttribute("edgeBottom")!=null){									//bot must go up
+		if(signY > 0){botArmy[botNum].rise=Math.abs(getRise)*-1;}
+	} 
+
+	if(getCurrPos.getAttribute("edgeLeft")!=null){											//bot must go right
+		if(signX < 0){botArmy[botNum].run=Math.abs(getRun);}
+	}
+	else if(getCurrPos.getAttribute("edgeRight")!=null){									//bot must go left
+		if(signX > 0){botArmy[botNum].run=Math.abs(getRun)*-1;}
+	}
+}
+
+/*
+function checkPosEdge(botNum)
+{
+	var getRise=parseInt(botArmy[botNum].rise);
+	var getRun=parseInt(botArmy[botNum].run);
+	var getBotID="bot"+botNum;
+	//var getCurrPos=browseAdj(getBotID).parentNode;
+	var getCurrPosID=botArmy[botNum].position;
+	getCurrPosID="TDdisplayPos"+getCurrPosID;
+	var getCurrPos=browseAdj(getCurrPosID);
+	if(getCurrPos.getAttribute("edgeTop")!=null){botArmy[botNum].rise=Math.abs(getRise);}	//bot must go down
+	else if(getCurrPos.getAttribute("edgeBottom")!=null){botArmy[botNum].rise=Math.abs(getRise)*-1;} 	//bot must go up
+	if(getCurrPos.getAttribute("edgeLeft")!=null){botArmy[botNum].run=Math.abs(getRun);}	//bot must go right
+	else if(getCurrPos.getAttribute("edgeRight")!=null){botArmy[botNum].run=Math.abs(getRun)*-1;} 	//bot must left
+	//double check the position so the bot doesn't move out of the matrix
+	doubleCheckPosEdge(botNum);
+}
+
+function doubleCheckPosEdge(botNum)
+{
+	var getBotID="bot"+botNum;
+	//var getCurrPosNum=parseInt(browseAdj(getBotID).parentNode.getAttribute("gridNum"));
+	var getCurrPosNum=parseInt(botArmy[botNum].position);
+	//browseAdj("testBox").innerHTML+="dCPE1: count - "+globalCounter+" & bot - "+botNum+"<br/>";
+	//it is important to know the direction the bot is going in, therefore use "rise/absolute(rise)" just to find the sign. 
+	var nextY=(parseInt(botArmy[botNum].rise)/Math.abs(parseInt(botArmy[botNum].rise)))*numBoxX;
+	var nextX=parseInt(botArmy[botNum].run)/Math.abs(parseInt(botArmy[botNum].run));
+	//browseAdj("testBox").innerHTML+="dCPE2: count - "+globalCounter+" & bot - "+botNum+"<br/>";
+	var nextPos=getCurrPosNum+nextY+nextX; 
+	var totalTiles=numBoxX*numRows;
+	if(!(nextPos < totalTiles) || !(nextPos >= 0)){checkPosEdge(botNum);}
+	//if(!(nextPos < totalTiles)){checkPosEdge(botNum);}
+	//if(!(nextPos >= 0)){checkPosEdge(botNum);}
+	//THIS PART OF THE FUNCTION IS BEING CALLED TWICE!!!! WHY?!?!?!?
+	//ANS: only happens when the checkPosEdge() function is called again. This could be that since the rest of the 
+	//function hasn't executed it is being held in a queue, waiting to be called again. A way to test this is to add a "randomNumGenerator"
+	//that gives a random # per run & see if the 2 corresponding random #s show up per run.
+	//alert(botNum+": dCPE 9 - R: "+randNum);
+	//alert(botNum+": dCPE 10  - R: "+randNum); 
+}
+*/
+
+function fixOldPos(oldPosNum)
+{
+	var dispID="displayPos"+oldPosNum;
+	var TDdispID="TD"+dispID;
+	browseAdj(TDdispID).innerHTML="<div id='"+dispID+"' gridNum="+oldPosNum+" class='macroPixel' style='width:"+mPWidth+";height:"+mPWidth+";'>&nbsp;</div>";
+}
+
+//FUNCTIONS TO RECORD DATA
+function recordCollisionEvent(bot1,bot2)
+{
+	//get the bots involved in the collision
+	//generate the delimiter text: event type:event type value:bot #:frame #
+	var textBot1="b:1:"+bot1+":"+globalCounter+";";
+	var textBot2="b:1:"+bot2+":"+globalCounter+";";
+	//add it to the "rawData" hidden input
+	browseAdj("rawData").value+=textBot1+""+textBot2;
+}
+
+function recordBotSpeeds()
+{
+	var getBotNum,rise,run,botSpeed;
+	//loop through all bots
+	var allBots=document.getElementsByName("bot");
+	for(var x=0;x<allBots.length;x++)
+	{
+		//get botNum
+		getBotNum=allBots[x].getAttribute("botNum");
+		//get bot info
+		rise=parseInt(botArmy[getBotNum].rise);
+		run=parseInt(botArmy[getBotNum].run);
+		botSpeed=rise/run;
+		browseAdj("rawData").value+="s:"+botSpeed+":"+getBotNum+":"+globalCounter+";";	
+	}
+}
+
+function getRawData(e)
+{
+	mouseOrig(e);
+	/*
+	//get bot types
+	var getBotStr=getBotTypes();
+	//get action script
+	convertToArray();
+	var packageStr=getBotStr+"|"+arrayString+"|"+totalFrame+":"+largestCol;
+	var yOrig2=yOrig-40;
+	*/
+	var rawData=browseAdj("rawData").value;
+	var dataStrBox="<table class='popUpBox' style='position:absolute;left:"+xOrig+";top:"+yOrig+";z-index:100;background-color:#333333;'>";
+	dataStrBox+="<tr><td>Data String</td><td class='closeX' onclick='closePopUps()'>X</td></tr>";
+	dataStrBox+="<tr><td colspan='2'><textarea class='textField'>"+rawData+"</textarea></td></tr></table>";
+	browseAdj("popUpArea").innerHTML=dataStrBox;
+}
+
+function setAnalysisParameters(e)
+{
+	mouseOrig(e);
+	var rawData=browseAdj("rawData").value;
+	var dataStrBox="<table class='popUpBox' style='position:absolute;left:"+xOrig+";top:"+yOrig+";z-index:100;background-color:#333333;'>";
+	dataStrBox+="<tr><td>Data Analysis</td><td class='closeX' onclick='closePopUps()'>X</td></tr>";
+	dataStrBox+="<tr><td colspan='2'>Frame Binning&nbsp;&nbsp;&nbsp;<input id='frameBin' class='textField' type='text' size='3'/></td></tr>";
+	dataStrBox+="<tr><td colspan='2'>Excel Table<br/><div id='excelTable' onclick='selectText(this.id)'></div></td></tr>";
+	dataStrBox+="<tr><td colspan='2' class='buttonGray' style='background-color:#5CA4F5;' onclick='analyzeRawData();'>Submit</td></tr></table>";
+	//dataStrBox+="<tr><td><textarea class='textField'>"+rawData+"</textarea></td></tr></table>";
+	browseAdj("popUpArea").innerHTML=dataStrBox;
+}
+
+function arrayOfZeroes(row,col)
+{
+	var newArray=new Array(row);
+	//make each row of the array another array, thus making this a 2D array
+	for(a=0;a<row;a++)
+	{
+		newArray[a]=new Array(col);
+	}
+	for(x=0;x<newArray.length;x++)
+	{
+		for(y=0;y<newArray[x].length;y++)
+		{
+			newArray[x][y]=0;
+		}
+	}
+
+	return newArray;
+}
+
+function analyzeRawData()
+{
+	var frameBin=browseAdj("frameBin").value;
+	if(frameBin==""){frameBin=1;}
+	//types of events: "b" - bump or collision, "c" - concentration, "s" - speed	
+	//manipulate data string
+	var rawData1=browseAdj("rawData").value;
+	var rawData2=rawData1.split(";");
+	//separate collision data from raw data
+	var collisionSumArray=makeArrayOfSums(frameBin,globalCounter,botCounter,"b");
+	var collisionAvgArray=makeArrayOfAverages(frameBin,collisionSumArray);
+	//collisionSumArray=normalize2DArray(collisionSumArray,0);
+	//separate speed data from raw data
+	//var speedSumArray=makeArrayOfSums(frameBin,globalCounter,botCounter,"s");
+	//var speedAvgArray=makeArrayOfAverages(frameBin,speedSumArray);
+	//speedSumArray=normalize2DArray(speedSumArray,0);	
+	//alert("aRD2: "+collisionSumArray.length+" | "+collisionSumArray[0].length);
+	//initialize the header & array to display the data in a table
+	var numOfBins=Math.ceil(globalCounter/frameBin)+1;	//ERROR FIXED: need to at "+1" as the "frameNum=Math.ceil(datum[3]/frameBin);" below will go above the index of the variable
+	initiateTableArray(numOfBins);
+	makeArrayOfTD(collisionSumArray,"Sum of Collisions");
+	makeArrayOfTD(collisionAvgArray,"Avg Collisions");
+	//makeArrayOfTD(speedSumArray,"Sum of Speed");
+	//makeArrayOfTD(speedAvgArray,"Avg of Speed");
+	displayArrays();
+}
+
+function normalize2DArray(arrayOI,typeOfNorm)
+{
+	//NOTE: assumed that arrayOI is a 2D array
+	//find largest value in array
+	var maxValOI;
+	var absMax=1;
+	var maxValArray=new Array();
+	//initialize maxValArray
+	for(var m=0;m<arrayOI[0].length+1;m++){maxValArray[m]=1;}
+	//find the max value for each bot
+	for(var a=0;a<arrayOI.length;a++)
+	{
+		for(var b=0;b<arrayOI[a].length;b++)
+		{
+			//selected index b for maxValArray because the maxVal is being compared to each bot in a specific frame, where index "a" is the frame & index "b" is the bot
+			if(maxValArray[b]<Math.abs(arrayOI[a][b])){maxValArray[b]=Math.abs(arrayOI[a][b]);}
+		}
+	}
+	//find absolute max value
+	for(var c=0;c<maxValArray.length;c++){
+		if(absMax<maxValArray[c]){absMax=maxValArray[c];}
+	}
+	//divide all the values in the array
+	for(var d=0;d<arrayOI.length;d++)
+	{
+		//alert("loop 1: "+d+" of "+arrayOI.length);
+		for(var e=0;e<arrayOI[d].length;e++)
+		{
+			//if typeOfNorm==1, then each bot is normalized by its own max, ELSE the entire array is normalized by a global max value
+			//alert("loop 2.0: "+e+" of "+arrayOI[e].length);
+			if(typeOfNorm==1){maxValOI=maxValArray[e];}
+			else{maxValOI=absMax;}
+			arrayOI[d][e]=arrayOI[d][e]/maxValOI;
+		}
+	}
+	return arrayOI;
+}
+
+function makeArrayOfSums(frameBin,row,col,delimiter)
+{
+	var datum,eventVal,botNum,frameNum;
+	var rawData1=browseAdj("rawData").value;
+	var rawData2=rawData1.split(";");
+	var numOfBins=Math.ceil(row/frameBin)+1;	//ERROR FIXED: need to at "+1" as the "frameNum=Math.ceil(datum[3]/frameBin);" below will go above the index of the variable
+	//make an array of zeroes
+	var sumArray=arrayOfZeroes(numOfBins,col);
+	//alert("aRD1.5 - "+rawData2.length+" | collisionArray:"+collisionData.length+" | "+collisionData[0].length);	
+	//create the sum array
+	for(b=0;b<rawData2.length-1;b++)		//the last data string is a null since the "split" command takes information after the last semicolon
+	{
+		datum=rawData2[b].split(":");
+		//0 - event type, 1 - event type value, 2 - bot #, 3 - frame #
+		//USING THE EVENT TYPE, DATUM FOR DIFFERENT TYPES OF EVENTS CAN BE SORTED!!!
+		if(datum[0]==delimiter)
+		{
+			eventVal=parseInt(datum[1]);
+			botNum=datum[2];
+			frameNum=Math.ceil(datum[3]/frameBin);
+			//alert("mAS4: "+frameNum+" of "+numOfBins+" | LOOP: "+b+" of "+rawData2.length);
+			sumArray[frameNum][botNum]=parseInt(sumArray[frameNum][botNum])+eventVal;
+		}
+	}
+	return sumArray;
+}
+
+function makeArrayOfAverages(frameBin,sumArray)
+{
+	var avgArray=arrayOfZeroes(sumArray.length,sumArray[0].length);
+	for(i=0;i<sumArray.length;i++)
+	{
+		for(j=0;j<sumArray[i].length;j++)
+		{
+			avgArray[i][j]=sumArray[i][j]/frameBin;
+		}
+	}
+	return avgArray;
+}
+
+function initiateTableArray(arraySize)
+{
+	header="";
+	tableArray=new Array(arraySize);
+	for(var w=0;w<tableArray.length;w++){tableArray[w]="";}
+}
+
+function makeArrayOfTD(arrayOI,title)
+{
+	//need global Array variable to store each table
+	//global variable header keeps track of what the data means in each column
+	for(v=0;v<arrayOI[0].length;v++){header+="<td>"+title+" :: botNum "+v+"</td>";}
+	//global variable tableArray keeps data from each array recorded into <td> cells
+	for(var x=0;x<arrayOI.length;x++)
+	{
+		for(var y=0;y<arrayOI[x].length;y++){
+			tableArray[x]+="<td>"+arrayOI[x][y]+"</td>";
+		}
+	}
+}
+
+function displayArrays()
+{
+	var displayData="<table class='arrayDisplay' border='0' cellspacing='0' cellpadding='0'><tr><td>Frame</td>";
+	//add headers to each column
+	displayData+=header;
+	displayData+="</tr>";
+	for(var d=0;d<tableArray.length;d++)
+	{
+		displayData+="<tr><td>"+d+"</td>";
+		displayData+=tableArray[d];
+		displayData+="</tr>";
+	}
+	displayData+="</table>";
+	browseAdj("excelTable").innerHTML=displayData;	
+}
+
+/*
+function displayArrays2(arrayOI)
+{
+	var displayData="<table class='arrayDisplay' border='0' cellspacing='0' cellpadding='0'><tr><td>Frame</td>";
+	for(var c=0;c<arrayOI[0].length;c++)
+	{
+		displayData+="<td>Collisions - botNum "+c+"</td>";
+	}
+	displayData+="</tr>";
+	for(var d=0;d<arrayOI.length;d++)
+	{
+		displayData+="<tr><td>"+d+"</td>";
+		for(var e=0;e<arrayOI[d].length;e++)
+		{
+			displayData+="<td>"+arrayOI[d][e]+"</td>";
+		}
+		displayData+="</tr>";
+	}
+	displayData+="</table>";
+	browseAdj("excelTable").innerHTML=displayData;	
+}
+*/
+
+//ACTION FUNCTION ENDS
+function initialFunctions()
+{
+	//find out the dimensions of window
+	browserSize();
+	//find # of boxes in X direction
+	mPWidth=Math.round(widthOfWindow/numBoxX);		//mP - macropixels. NOTE: numBoxX is a global variable that specifies the # of boxes in 1 row
+	//since I want each box to be a square, the width=height. Thus, height/(width of each box)
+	numRows=Math.round(heightOfWindow/mPWidth);
+	//generate matrix of boxes.
+	generateMatrix();
+	//center the matrix of boxes
+	centerMatrix();
+}
+</script>
+</head>
+<body onload="initialFunctions()">
+<span id="popUpArea"></span>
+<table style="position:relative;z-index:10;"><tr>
+<td><span class="pressButton" onclick="displayControlPanel()">Menu</span></td>
+<td>
+<span id="controlPanel" style="display:block;">
+	<span class="pressButton" onclick="startAnimation()">Play</span>
+	<span class="pressButton" onclick="stopAnimation()">Stop</span>
+	<span class="pressButton" onclick="TESTCheckEdge()">Check Edge</span>
+	<span class="pressButton" onclick="getRawData(event)">Raw Data</span>
+	<span class="pressButton" onclick="setAnalysisParameters(event)">Analysis Parameters</span>
+</span>
+</td>
+<td>
+<div id="dia" style="position:relative;z-index:1;width:600px;height:55px;background-color:#555555;font:8px Rockwell, 'Courier New', Courier, Georgia, serif;"></div>
+</td>
+<td>
+<div id="counter" style="padding:5px;background-color:#555555;font:8px Rockwell, 'Courier New', Courier, Georgia, serif;"></div>
+</td>
+</tr>
+</table>
+
+<div id="matrixArea" style="position:absolute;left:0;top:0;"></div>
+<br/>
+<div id="testBox"></div>
+<input id="rawData" type="hidden"></input>
+<br/>
+<span id="TESTAREA"></span>
+</body>
+</html>

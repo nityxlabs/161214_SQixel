@@ -1,0 +1,2114 @@
+<html>
+<head>
+<title>CosmosNine.</title>
+<link rel="stylesheet" type="text/css" href="CosmosSteelo.css" />
+<script src="jquery.js"></script> 
+<script type="text/javascript">
+var isIE=document.all;
+//global counter - used to keep track of bots moving
+var globalCounter=0;
+var stopCounter=100000;
+//mouse movement
+var xOrig=0;
+var yOrig=0;
+
+//browserSize
+var widthOfWindow;	//for window dimensions - width
+var heightOfWindow;	//for window dimensions - height
+
+//global variables
+var mPWidth=0;
+var numRowsY=0;
+var numBoxX=50; 		//for generateMatrix()
+var botCounter=0;		//for addBot()
+var botArmy=new Array();
+var botTypeCounter=0;
+var botTypeList=new Array();
+var currBotPaint=0;
+var currBotForInteract=0;
+var rxnCount=0;			//count the # of reactions the form
+var allInteractionStr="|";
+var botNumTracker=0;		//for animateMatrixSpace - slow motion
+//Stop animation
+var stopClick=false;
+var cycleComplete=false;
+//for generateSerialSlope
+var xRange=5;			//for generating random x slopes
+var yRange=5;			//for generating random y slopes
+var xSlopeCount=1;		//this will be the x slope of the bot, incrementing by 1 after being assigned to bot's xSlope
+var ySlopeCount=1;		//this will be the y slope of the bot, incrementing by 1 after being assigned to bot's ySlope
+var xIteration=1;		//this keeps track of the # of times xSlopeCount has reach xRange
+var yIteration=1;		//this keeps track of the # of times ySlopeCount has reach yRange
+//format of allInteractionStr - "|rID0:4*6-2*4*6;7*3*5|", 
+//where ":" separate different reactions, "*" separate each bot, "-" separates input & output, ";" separate output1 from output2.
+//NOTE: output1 is before the ";", & refers to input1, & output2 is after "|" & refers to input2
+
+//for setting up randomly placed people
+var RNOP;		//Random Number of People
+
+//autonomously moving a person
+var animationTimer;
+
+//different types of movements
+var peepsMove=new Array();
+var moveInterval=new Array();
+//movement1()
+var move1=0;
+//movement2
+var move2=0;
+
+//virtual grid
+var vGrid;
+var squareLength;
+//assignLeadersToGridBox
+var allStrRandBox="";
+
+//data analysis
+//for function intiateTableArray()
+var header;
+var tableArray;
+
+//TESTING INTERACTIONS
+function TESTSetUp()
+{
+	allInteractionStr="|rID0:0*1-0*1;1|";
+}
+
+//TEST checkBotsInReaction(bot1,bot2,changeX,changeY)
+function TESTcBIR()
+{
+	checkBotsInReaction(0,1,1,0);
+}
+
+function TESTCheckEdge()
+{
+	for(var a=0;a<botArmy.length;a++){
+		alert("TCE"+a+" of "+botArmy.length);
+		checkPosEdge2(a);
+	}
+}
+
+function browseAdj(x)
+{
+var object;
+	 if(document.getElementById){	//Mozilla
+                  object=document.getElementById(x);
+            }else if(document.all){		//Internet Explorer
+                  object=document.all[x];
+            }else if(document.layers){		//Netscape
+                  object=document.layers[x];
+            }          
+return object;
+}
+
+function browserSize() {
+	  var myWidth = 0, myHeight = 0;
+	  if( typeof( window.innerWidth ) == 'number' ) {   //Non-IE
+	    myWidth = window.innerWidth;
+	    myHeight = window.innerHeight;
+	    myXScroll = window.pageXOffset;
+	    myYScroll = window.pageYOffset;
+	  } else if(document.documentElement && ( document.documentElement.clientWidth || document.documentElement.clientHeight ) ) {
+	    //IE 6+ in 'standards compliant mode'
+	    myWidth = document.documentElement.clientWidth;
+	    myHeight = document.documentElement.clientHeight;
+	    myXScroll = document.documentElement.scrollLeft;
+	    myYScroll = document.documentElement.scrollTop;
+	  } else if( document.body && ( document.body.clientWidth || document.body.clientHeight ) ) {  //IE 4 compatible
+	    myWidth = document.body.clientWidth;
+	    myHeight = document.body.clientHeight;
+	    myXScroll = document.body.scrollLeft;
+	    myYScroll = document.body.scrollTop;
+	  }
+	  widthOfWindow=myWidth-100;
+	  heightOfWindow=myHeight-100;
+	  currentXScroll=myXScroll;
+	  currentYScroll=myYScroll;
+	  //window.alert( 'Width = ' + myWidth );
+	  //window.alert( 'Height = ' + myHeight );  
+	}
+
+
+function mouseOrig(x)
+{
+	if (browseAdj(x))
+	{
+		xOrig = window.event.x;
+		yOrig = window.event.y;		
+	}
+	else //works for Netscape & Mozilla
+	{
+		xOrig = x.pageX;
+		yOrig = x.pageY;	
+	}
+}
+
+//FROM: http://stackoverflow.com/questions/1173194/select-all-div-text-with-single-mouse-click
+//SEE ALSO: http://www.quirksmode.org/dom/range_intro.html
+function selectText(containerid) {
+    if (document.selection) {
+        var range = document.body.createTextRange();
+        range.moveToElementText(document.getElementById(containerid));
+        range.select();
+    } else if (window.getSelection) {
+        var range = document.createRange();
+        range.selectNode(document.getElementById(containerid));
+        window.getSelection().addRange(range);
+    }
+}
+
+function retrieveNodeArray(NameOfNode,NodeTrait,SpecificTrait)
+{
+	//NameOfNode - access the name attribute of the node
+	//NodeTrait - the attribute of interest for the node (getAttribute)
+	//SpecificTrait - the value the NodeTrait should match
+	//create array
+	var i;
+	var k=0;
+	var ArrayOfNodes=new Array();
+	var e=new Array();
+	var e=document.getElementsByName(NameOfNode);
+	//for(i in e)
+	for(i=0;i<e.length;i++)
+	{
+		if(e[i].getAttribute(NodeTrait)==SpecificTrait)
+		{
+			ArrayOfNodes[k]=e[i];
+			k++;			
+		}
+	}
+	return ArrayOfNodes;
+}
+
+function randomColorGenerator()
+{
+	var colorString;
+	var colorR=Math.floor(Math.random()*255);
+	var colorB=Math.floor(Math.random()*255);
+	var colorG=Math.floor(Math.random()*255);
+	colorString="rgb("+colorR+","+colorB+","+colorG+")";
+	return colorString;
+}
+
+//FUNCTION Menu
+function displayControlPanel()
+{
+	if(browseAdj("controlPanel").style.display=="none")
+	{browseAdj("controlPanel").style.display="block";}
+	else if(browseAdj("controlPanel").style.display=="block")
+	{browseAdj("controlPanel").style.display="none";}
+}
+
+function closePopUps()
+{
+	browseAdj("popUpArea").innerHTML="";
+}
+
+//COSMOS.NINE. Functions start
+function generateMatrix(getNumOfCol,getNumOfRows)
+{
+	var matrixArea,mPPosID,PDisplayPosID,TDposID,TDdisplayID,mPBotID;
+	//get # of boxes in X & Y axis
+	var mPCount=0;
+	//interactArea - area where the user can interact with the grid	
+	interactArea="<table id='interactMatrix' style='position:absolute;left:0;top:0;z-index:5;' border='0' cellspacing='1' cellpadding='0'>";
+	//displayArea - area displaying the physical grid, this is just for the user's convenience
+	displayArea="<table id='displayMatrix' style='position:absolute;left:0;top:0;z-index:1;' border='0' cellspacing='1' cellpadding='0'>";
+	for(y=0;y<getNumOfRows;y++)
+	{
+		interactArea+="<tr>";
+		//matrixArea+="<tr>";
+		displayArea+="<tr>";
+		for(x=0;x<getNumOfCol;x++)
+		{
+			mPPosID="gridPos"+mPCount;
+			mPDisplayPosID="displayPos"+mPCount;
+			TDposID="TD"+mPPosID;
+			TDdisplayID="TD"+mPDisplayPosID;
+			interactArea+="<td id='"+TDposID+"' gridNum="+mPCount+"><div id='"+mPPosID+"' gridNum="+mPCount+" lightSense='Y' lightOn='#ABABAB' lightOff='transparent' class='macroClearPixel' style='width:"+mPWidth+";height:"+mPWidth+";' onmouseover='cursorLightOn(event)' onmouseout='cursorLightOff(event)' onclick='addBot(event)'>&nbsp;</div></td>";
+			displayArea+="<td id='"+TDdisplayID+"' gridNum="+mPCount+"><div id='"+mPDisplayPosID+"' gridNum="+mPCount+" class='macroPixel' style='width:"+mPWidth+";height:"+mPWidth+";'>&nbsp;</div></td>";
+			mPCount++;
+		}
+		interactArea+="</tr>";
+		displayArea+="</tr>";
+	}
+	interactArea+="</table>";
+	displayArea+="</table>";
+	browseAdj("matrixArea").innerHTML=interactArea;
+	browseAdj("matrixArea").innerHTML+=displayArea;
+	//label the edges of the matrix so when the bot moves it know where the edges are
+	matrixLabelEdges(getNumOfCol,getNumOfRows);
+}
+
+//labels the edges of the matrixGrid that are the top, bottom, left or right sides
+function matrixLabelEdges(getNumOfCol,getNumOfRows)
+{
+	var tileID,tileID2,rightVal;
+	var totalTiles=getNumOfCol*getNumOfRows;
+	//label top edges
+	for(var t=0;t<getNumOfCol;t++)
+	{
+		tileID="TDdisplayPos"+t;
+		browseAdj(tileID).setAttribute("edgeTop","1");
+	}
+	//label left & right edges
+	for(var l=0;l<totalTiles;l=l+getNumOfCol)
+	{
+		tileID="TDdisplayPos"+l;
+		rightVal=l+49;
+		tileID2="TDdisplayPos"+rightVal;
+		browseAdj(tileID).setAttribute("edgeLeft","1");
+		browseAdj(tileID2).setAttribute("edgeRight","1");
+	}
+	//label bottom edges
+	var lastRow=totalTiles-getNumOfCol;
+	for(var b=lastRow;b<totalTiles;b++)
+	{
+		tileID="TDdisplayPos"+b;
+		browseAdj(tileID).setAttribute("edgeBottom","1");
+	}
+}
+
+function centerMatrix()
+{
+	var matrixWidth=browseAdj("displayMatrix").offsetWidth;
+	var matrixHeight=browseAdj("displayMatrix").offsetHeight;
+	var extraSpaceX=Math.abs(widthOfWindow-matrixWidth);
+	var extraSpaceY=Math.abs(heightOfWindow-matrixHeight);
+	//alert("cM1 - W: "+matrixWidth+" | H: "+matrixHeight+"");
+	var matrixPosX=extraSpaceX/2;
+	var matrixPosY=extraSpaceY/2;
+	browseAdj("matrixArea").style.left=matrixPosX;
+	browseAdj("matrixArea").style.top=60;
+	//alert("cM2 - L: "+browseAdj("displayMatrix").style.left+" | H: "+browseAdj("displayMatrix").style.top+"");
+}
+
+
+//SET BOT TYPE
+function botColorSwatch()
+{
+	var colorGrid,colorString;
+	var r,g,b;
+	colorGrid="<table>";
+	//red
+	colorGrid+="<tr>";
+	for(a1=0;a1<9;a1++)
+	{
+		r=220;
+		g=20+15*a1;
+		b=90+15*a1;
+		colorString="rgb("+r+","+g+","+b+")";
+		colorGrid+="<td class='colorBox' style='background:"+colorString+";' onclick='selectBotColor(event)'></td>";
+	}
+	colorGrid+="</tr>";
+	//orange
+	colorGrid+="<tr>";
+	for(a1=0;a1<9;a1++)
+	{
+		r=210;
+		g=150;
+		b=30+20*a1;
+		colorString="rgb("+r+","+g+","+b+")";
+		colorGrid+="<td class='colorBox' style='background:"+colorString+";' onclick='selectBotColor(event)'></td>";
+	}
+	colorGrid+="</tr>";
+	//green
+	colorGrid+="<tr>";
+	for(a1=0;a1<9;a1++)
+	{
+		r=20+20*a1;
+		g=220;
+		b=150;
+		colorString="rgb("+r+","+g+","+b+")";
+		colorGrid+="<td class='colorBox' style='background:"+colorString+";' onclick='selectBotColor(event)'></td>";
+	}
+	colorGrid+="</tr>";
+	//blue
+	colorGrid+="<tr>";
+	for(a1=0;a1<9;a1++)
+	{
+		r=20+20*a1;
+		g=150;
+		b=220;
+		colorString="rgb("+r+","+g+","+b+")";
+		colorGrid+="<td class='colorBox' style='background:"+colorString+";' onclick='selectBotColor(event)'></td>";
+	}
+	colorGrid+="</tr>";
+	//violet
+	colorGrid+="<tr>";
+	for(a1=0;a1<9;a1++)
+	{
+		r=110;
+		g=20+20*a1;
+		b=170;
+		colorString="rgb("+r+","+g+","+b+")";
+		colorGrid+="<td class='colorBox' style='background:"+colorString+";' onclick='selectBotColor(event)'></td>";
+	}
+	colorGrid+="</tr>";
+
+	colorGrid+="</table>";
+	return colorGrid;
+}
+
+function selectBotColor(e)
+{
+	var colorInfo=isIE ? e.srcElement : e.target;
+	botColor=colorInfo.style.backgroundColor;
+	browseAdj("testBotColor").style.backgroundColor=botColor;
+}
+
+function cursorLightOn(e)
+{
+	var mP=isIE ? e.srcElement : e.target;
+	//get current bot selected
+	//var getColor="#ABABAB";
+	//var getColor=botTypeList[currBotPaint].botColor;
+	//var getColor=randomColorGenerator();
+	if(mP.getAttribute("lightSense")=="Y"){mP.style.backgroundColor=mP.getAttribute("lightOn");}
+}
+
+function cursorLightOff(e)
+{
+	var mP=isIE ? e.srcElement : e.target;
+	if(mP.getAttribute("lightSense")=="Y"){mP.style.backgroundColor=mP.getAttribute("lightOff");}	
+}
+
+function cursorLightOff2(e)
+{
+	var mP=isIE ? e.srcElement : e.target;
+	mP.style.backgroundColor="#222222";	
+}
+
+//COSMOS.NINE. Functions end
+
+
+//BOT FUNCTIONS BEGIN
+function botType(botID,botName,botMovement,botColor,botRise,botRun,randomizeSlope,counterStat)
+{
+	this.botID=botID;
+	this.botName=botName;
+	this.botMovement=botMovement;		//0 = stationary, 1 = moving
+	this.botColor=botColor;
+	this.botRise=botRise;
+	this.botRun=botRun;
+	this.randomizeSlope=randomizeSlope;
+	this.counterStat=counterStat;		//false = bot does not count, true = bot does count
+	this.botCounter=0;					//this records the count for each bot;
+}
+
+function Bot(botNum,botSpecies,botName,botMovement,active,position,color,rise,run,startCount)
+{
+	this.botNum=botNum;
+	this.botSpecies=botSpecies;
+	this.botName=botName;
+	this.botMovement=botMovement;		//0=stationary, 1=moving
+	this.active=active;		//0=inactive, 1=active
+	this.position=position;
+	this.color=color;
+	//refers to the slope=rise/run
+	this.rise=parseInt(rise);
+	this.run=parseInt(run);
+	this.botCounter=startCount;
+	//other ideas: frame caption, bot mood
+}
+
+function getSlopeInfo(getBot)
+{
+	var sS;
+	if(getBot.botMovement==0){sS=getBot.botRise+" / "+getBot.botRun+" Static";}
+	else if(getBot.randomizeSlope==1){sS=getBot.botRise+" / "+getBot.botRun+" Random";}
+	else{sS=getBot.botRise+" / "+getBot.botRun+" (Rise/Run)";}
+
+	return sS;
+}
+
+//CREATE BOT TYPES
+function botMenu(e)
+{
+	//show list of bots that already exist & an option to add a new bot
+	//Bot Traits - name, rise, run, color
+	mouseOrig(e);
+	var botForm="<div id='botForm' style='display:none;'><table class='popUpInsert'><tr><td>Bot Name</td><td><input type='text' class='textField' id='createBotName'/></td></tr>";
+	botForm+="<tr><td colspan='2'><div style='width:100%;height:1px;background-color:#555555;'></div></td></tr>";
+	botForm+="<tr><td id='bSKinetic' class='buttonGray' style='background-color:#5CA4F5;' onclick='bMSetbotMovement(1)'>Kinetic</td><td id='bSStatic' class='buttonGray' style='background-color:#AAAAAA;' onclick='bMSetbotMovement(0)'>Static</td></tr>";
+	botForm+="<tr><td id='rBSButton' colspan='2' class='buttonGray' randStat='0' style='background-color:#AAAAAA;' onclick='randomizeBotTypeSlope(event)'>Randomize Slope: off</td></tr>";
+	botForm+="<tr><td>Rise</td><td><input type='text' class='textField' id='createBotRise' size='2'/></td></tr>";
+	botForm+="<tr><td>Run</td><td><input type='text' class='textField' id='createBotRun' size='2'/></td></tr>";
+	botForm+="<tr><td colspan='2'><div style='width:100%;height:1px;background-color:#555555;'></div></td></tr>";
+	botForm+="<tr><td colspan='2'>Bot Characteristics</td></tr>";
+	botForm+="<tr><td>Count</td><td><input type='checkbox' id='counterStat' name='botTraits' value='count'/></td></tr>";
+	botForm+="<tr><td colspan='2'><div style='width:100%;height:1px;background-color:#555555;'></div></td></tr>";
+	var getBCS=botColorSwatch();
+	botForm+="<tr><td>Color<br/><div id='testBotColor' class='macroPixel' style='background-color:rgb(20,20,20);width:35px;height:35px;'>&nbsp;</div></td><td>"+getBCS+"</td></tr>";
+	botForm+="<tr><td colspan='2' class='buttonRed' onclick='generateBotType()'>Add Bot</td></tr></table></div>";
+	botForm+="<input type='hidden' id='botMovementVal' value='1'>";
+	
+	var botListBox="<table class='popUpBox' style='position:absolute;left:"+xOrig+";top:"+yOrig+";z-index:100;background-color:#333333;'>";
+	botListBox+="<tr><td>Bot Menu</td><td class='closeX' onclick='closePopUps()'>X</td></tr>";
+	botListBox+="<tr><td colspan='2' class='buttonGray' style='background-color:#5CA4F5;' onclick='showCreateBotForm()'>Create Bot</td></tr>";
+	botListBox+="<tr><td colspan='2'>"+botForm+"</td></tr>";
+	botListBox+="<tr><td colspan='2'><div style='width:100%;height:1px;background-color:#555555;'></div></td></tr>";
+	botListBox+="<tr><td colspan='2'>Current Bot</td></tr>";
+	botListBox+="<tr><td colspan='2'><div style='width:100%;height:1px;background-color:#555555;'></div></td></tr>";
+	botListBox+="<tr><td colspan='2'>Bot List<br/><div id='botListArea'></div></td></tr>";
+	botListBox+="</table>";
+	//botListBox+="<tr><td><textarea class='textField'>"+rawData+"</textarea></td></tr></table>";
+	browseAdj("popUpArea").innerHTML=botListBox;
+	showBotTypeList();
+}
+
+function randomizeBotTypeSlope(e)
+{
+	var rBSButton=isIE ? e.srcElement : e.target;
+	if(rBSButton.getAttribute("randStat")=="0")
+	{
+		rBSButton.setAttribute("randStat","1");
+		rBSButton.style.backgroundColor="#D4324D";
+		rBSButton.innerHTML="Randomize Slope: ON";
+	}
+	else
+	{
+		rBSButton.setAttribute("randStat","0");
+		rBSButton.style.backgroundColor="#AAAAAA";
+		rBSButton.innerHTML="Randomize Slope: off";
+	}
+}
+
+function bMSetbotMovement(getVal)
+{
+	//set color of input/output button
+	browseAdj("bSKinetic").style.backgroundColor="#AAAAAA";
+	browseAdj("bSStatic").style.backgroundColor="#AAAAAA";
+	if(getVal==0){browseAdj("bSStatic").style.backgroundColor="#5CA4F5";}
+	else{browseAdj("bSKinetic").style.backgroundColor="#5CA4F5";}
+	browseAdj("botMovementVal").value=getVal;
+}
+
+function showCreateBotForm()
+{
+	if(browseAdj("botForm").style.display=="none"){browseAdj("botForm").style.display="block";}
+	else{browseAdj("botForm").style.display="none";}
+}
+
+function generateBotType()
+{
+	//METHOD: this function will create a bot with characteristics inputted from the menu from function "botMenu()"
+	var randomizeSlope,setRise,setRun;
+	//retrieve variables
+	var setName=browseAdj("createBotName").value;
+	if(setName==""){setName=botTypeCounter;}
+	var setMovement=browseAdj("botMovementVal").value;
+	if(setMovement==0)		//species 0 means the bot is stationary
+	{
+		randomizeSlope=0;
+		setRise=0;
+		setRun=0;
+	}
+	else		//else the bot species is dynamic, thus the bot moves
+	{
+		randomizeSlope=browseAdj("rBSButton").getAttribute("randStat");
+		setRise=browseAdj("createBotRise").value;
+		setRun=browseAdj("createBotRun").value;
+		if(setRise==""){setRise=1;}
+		if(setRun==""){setRun=1;}
+	}
+	//get color for bot
+	var setColor=browseAdj("testBotColor").style.backgroundColor;
+	//see if bot should count the number of times it bumps into another bot
+	var setCounter=browseAdj("counterStat").checked;
+	//create botType in array
+	botTypeList[botTypeCounter]=new botType(botTypeCounter,setName,setMovement,setColor,setRise,setRun,randomizeSlope,setCounter);		//(botID,botName,botColor,botRise,botRun)
+	botTypeCounter++;
+	//show updated list of bots
+	showBotTypeList();
+}
+
+function showBotTypeList()
+{
+	//sS = SlopeStat, this is showing whether the slope is stationary, random, or set
+	var displayBot,bgSelectedBot,sS;
+	var showBTL="<table><tr>";
+	//loop through list of all bots
+	for(var i=0;i<botTypeList.length;i++)
+	{	
+		if(currBotPaint==i){bgSelectedBot="#404040";}
+		else{bgSelectedBot="transparent";}
+		//check to see if slope is randomized
+		sS=getSlopeInfo(botTypeList[i]);
+		displayBot="<div class='macroPixel' botID='"+i+"' style='width:"+mPWidth+";height:"+mPWidth+";background-color:"+botTypeList[i].botColor+";'>&nbsp;</div>";
+		showBTL+="<td valign='top'>";
+		showBTL+="<div class='listElement' botID='"+i+"' onclick='selectBotPaint(event);showBotTypeList();' style='background-color:"+bgSelectedBot+";'>"+displayBot+"Name: "+botTypeList[i].botName+"<br/>Slope: "+sS+"</div>";
+		showBTL+="</td>";
+	}
+	showBTL+="</tr></table>";
+	//show list in bot list
+	browseAdj("botListArea").innerHTML=showBTL;
+}
+
+function showInteractBotList()
+{
+	//sS = SlopeStat, this is showing whether the slope is stationary, random, or set
+	var displayBot,bgSelectedBot,sS;
+	var showBTL="<table><tr>";
+	//loop through list of all bots
+	for(var i=0;i<botTypeList.length;i++)
+	{	
+		if(currBotForInteract==i){bgSelectedBot="#404040";}
+		else{bgSelectedBot="transparent";}
+		//check to see if slope is randomized
+		sS=getSlopeInfo(botTypeList[i]);
+		displayBot="<div class='macroPixel' botID='"+i+"' style='width:"+mPWidth+";height:"+mPWidth+";background-color:"+botTypeList[i].botColor+";'>&nbsp;</div>";
+		showBTL+="<td valign='top'>";
+		showBTL+="<div class='listElement' botID='"+i+"' onclick='selectBotForInteract(event);showInteractBotList();' style='background-color:"+bgSelectedBot+";'>"+displayBot+"Name: "+botTypeList[i].botName+"<br/>Slope: "+sS+"</div>";
+		showBTL+="</td>";
+	}
+	showBTL+="</tr></table>";
+	//show list in bot list
+	browseAdj("botListArea2").innerHTML=showBTL;
+}
+
+//for adding bots to the matrix area
+function selectBotPaint(e)
+{
+	var botInfo=isIE ? e.srcElement : e.target;
+	currBotPaint=parseInt(botInfo.getAttribute("botID"));
+}
+
+//for adding bots to the interaction menu
+function selectBotForInteract(e)
+{
+	var botInfo=isIE ? e.srcElement : e.target;
+	currBotForInteract=parseInt(botInfo.getAttribute("botID"));
+}
+
+//CREATE ACTUAL BOTS
+//create physical form of bot
+function generateBot(botNum)
+{
+	var botID="bot"+botNum;
+	var getBotColor=botArmy[botNum].color;
+	var builtBot="<div id='"+botID+"' name='bot' botNum='"+botNum+"' class='macroPixel' style='width:"+mPWidth+";height:"+mPWidth+";background-color:"+getBotColor+";'>&nbsp;</div>";
+	return builtBot;
+}
+
+//add bot to botArmy (all bots on grid) & place bot in the matrix
+function createAndGenBot(getBotTypeID,getPos,getRise,getRun,getActivity)
+{
+	var TDdispID="TDdisplayPos"+getPos;
+	//Bot(botNum,botSpecies,botName,botMovement,active,position,func,color,rise,run,recordCollision)
+	botArmy[botCounter]=new Bot(botCounter,botTypeList[getBotTypeID].botID,botTypeList[getBotTypeID].botName,botTypeList[getBotTypeID].botMovement,getActivity,getPos,botTypeList[getBotTypeID].botColor,getRise,getRun,0);
+	var buildABot=generateBot(botCounter);
+	//add bot to specific location
+	if(getActivity==1){browseAdj(TDdispID).innerHTML=buildABot;}
+	botCounter++;
+	//record addition of new bot 
+	recordConcentration(botTypeList[getBotTypeID].botID,1);
+}
+
+
+function updateBot(botNum,newBotInfo)
+{
+	//change all information about the bot to match the new bot
+	//botType(botID,botName,botMovement,botColor,botRise,botRun,randomizeSlope)
+	//Bot(botNum,botSpecies,botName,botMovement,active,position,func,color,rise,run)
+	//STEP - first, record the removal of the first bot
+	recordConcentration(botArmy[botNum].botSpecies,-1);
+	//STEP - modify information about the bot
+	botArmy[botNum].botSpecies=botTypeList[newBotInfo].botID;
+	botArmy[botNum].botName=botTypeList[newBotInfo].botName;
+	botArmy[botNum].botMovement=botTypeList[newBotInfo].botMovement;
+	botArmy[botNum].color=botTypeList[newBotInfo].botColor;
+	//if slope is randomize
+	var getSlope=createBotSlope(newBotInfo);		//index 0=rise, index 1=run
+	botArmy[botNum].rise=getSlope[0];
+	botArmy[botNum].run=getSlope[1];
+	//change physical color of the bot
+	var botID="bot"+botNum;
+	browseAdj(botID).style.backgroundColor=botArmy[botNum].color;
+	//STEP - then record the addition of the new bot to the population
+	recordConcentration(botTypeList[newBotInfo].botID,1);
+}
+
+function inactivateBot(botNum)
+{
+	botArmy[botNum].active=0;
+	recordConcentration(botArmy[botNum].botSpecies,-1);
+}
+
+function retrieveBots()
+{
+	var botInfoStr="";
+	for(var i=0;i<botArmy.length;i++){
+		var getBotID="bot"+i;
+		botInfoStr+="botID: "+botArmy[i].botNum+" | active: "+botArmy[i].active+" | pos:"+botArmy[i].position+" | move: "+botArmy[i].botMovement+" | rise: "+botArmy[i].rise+" | run: "+botArmy[i].run+"<br/>";
+	}
+	browseAdj("dia").innerHTML="# OF BOTS: "+botArmy.length+" ||| "+botInfoStr;
+}
+
+function createBotSlope(getBotType)
+{
+	var getRise,getRun,negY,negX;
+	if(parseInt(botTypeList[getBotType].randomizeSlope)==1)
+	{
+		//generate random slopes
+		getRise=Math.ceil(Math.random()*yRange);
+		negY=Math.random();
+		if(negY>0.5){getRise=getRise*-1;}
+		
+		getRun=Math.ceil(Math.random()*xRange);
+		negX=Math.random();
+		if(negX>0.5){getRun=getRun*-1;}	
+	}
+	else
+	{
+		getRise=parseInt(botTypeList[getBotType].botRise);
+		getRun=parseInt(botTypeList[getBotType].botRun);
+	}
+
+	return [getRise,getRun];
+}
+
+//add bot to the macropixel matrix
+function addBot(e)
+{
+	var getRun,getRise;
+	var getLoc=isIE ? e.srcElement : e.target;
+	var mPID=getLoc.getAttribute("id");		//macropixel ID
+	var mPGridPos=getLoc.getAttribute("gridNum");		//macropixel Grid Position
+	var TDdispID="TDdisplayPos"+mPGridPos;
+	//generate random color for bot
+	var botColor=randomColorGenerator();
+	//check if bot already exists in this position. If it already exists, then just modify this existing bot
+	//alert("aB2: "+browseAdj(TDdispID).nodeName+" | "+browseAdj(TDdispID).firstChild.getAttribute("botNum"));
+	if(browseAdj(TDdispID).firstChild.getAttribute("botNum")){
+		var getBotNum=parseInt(browseAdj(TDdispID).firstChild.getAttribute("botNum"));
+		var getBotID="bot"+getBotNum;
+		//update color of the new bot
+		updateBot(getBotNum,currBotPaint);			//NOTE: currBotPaint is a global variable
+	}
+	//else if no bot exists in this position, then create a new bot in this position
+	else{
+		var botID="bot"+botCounter;
+		getSlope=createBotSlope(currBotPaint);
+		/*
+		if(parseInt(botTypeList[currBotPaint].randomizeSlope)==1)
+		{
+			//generate random slopes
+			getRise=Math.ceil(Math.random()*yRange);
+			negY=Math.random();
+			if(negY>0.5){getRise=getRise*-1;}
+			
+			getRun=Math.ceil(Math.random()*xRange);
+			negX=Math.random();
+			if(negX>0.5){getRun=getRun*-1;}	
+		}
+		else
+		{
+			getRise=parseInt(botTypeList[currBotPaint].botRise);
+			getRun=parseInt(botTypeList[currBotPaint].botRun);
+		}
+		*/
+		createAndGenBot(currBotPaint,mPGridPos,getSlope[0],getSlope[1],1);
+	}
+	//TEST - want to observe changes to the bots
+	retrieveBots();
+}
+
+//remove bot to the macropixel matrix
+function removeBot()
+{
+	
+}
+//BOT FUNCTION ENDS
+
+//DESIGN INTERACTIONS
+function interactionMenu(e)
+{
+	//show list of bots that already exist & an option to add a new bot
+	//Bot Traits - name, rise, run, color
+	mouseOrig(e);	
+	var interactListBox="<table class='popUpBox' style='position:absolute;left:"+xOrig+";top:"+yOrig+";z-index:100;background-color:#333333;'>";
+	interactListBox+="<tr><td>Interaction Menu</td><td class='closeX' onclick='closePopUps()'>X</td></tr>";
+	interactListBox+="<tr><td colspan='2' class='buttonGray' style='background-color:#5CA4F5;' onclick='newInteractionForm()'>+ interaction</td></tr>";
+	interactListBox+="<tr><td id='showInteractForm' colspan='2'></td></tr>";
+	interactListBox+="<tr><td colspan='2'><div style='width:100%;height:1px;background-color:#555555;'></div></td></tr>";
+	interactListBox+="<tr><td colspan='2'>Interaction List<br/><div id='interactListArea'></div></td></tr>";
+	interactListBox+="</table>";
+	//interactListBox+="<tr><td><textarea class='textField'>"+rawData+"</textarea></td></tr></table>";
+	browseAdj("popUpArea").innerHTML=interactListBox;
+	//display all reactions
+	var getRxnDisplay=displayInteractions();
+	browseAdj("interactListArea").innerHTML=getRxnDisplay;
+}
+
+function newInteractionForm() 
+{
+	if(browseAdj("showInteractForm").innerHTML=="")
+	{
+		var lightOn="#555555";
+		var lightOff="#404040";
+		var interactForm="<table class='popUpInsert' cellpadding='0' cellspacing='5' border='0'><tr><td colspan='3'><div style='width:100%;height:1px;background-color:#555555;'></div></td></tr>";
+		interactForm+="<tr><td colspan='3'>Design Interaction</td></tr>";
+		//interaction fields
+		interactForm+="<tr><td valign='top' id='fieldInput1' class='vertBotList' fieldType='input1' lightSense='Y' lightOn='#555555' lightOff='#404040' onclick='addBotInteractField(event)' onmouseover='cursorLightOn(event)' onmouseout='cursorLightOff(event)'>input 1</td>";
+		interactForm+="<td style='text-align:center;'>+</td><td valign='top' id='fieldInput2' class='vertBotList' fieldType='input2' lightSense='Y' lightOn='#555555' lightOff='#404040' onclick='addBotInteractField(event)' onmouseover='cursorLightOn(event)' onmouseout='cursorLightOff(event)'>Input 2</td></tr>";
+		interactForm+="<tr><td colspan='3' style='text-align:center;'>&darr;</td></tr>";
+		interactForm+="<tr><td valign='top' id='fieldOutput1' class='vertBotList' fieldType='output' lightSense='Y' lightOn='#555555' lightOff='#404040' onclick='addBotInteractField(event)' onmouseover='cursorLightOn(event)' onmouseout='cursorLightOff(event)'>output 1</td>";
+		interactForm+="<td style='text-align:center;'>+</td><td valign='top' id='fieldOutput2' class='vertBotList' fieldType='output' lightSense='Y' lightOn='#555555' lightOff='#404040' onclick='addBotInteractField(event)' onmouseover='cursorLightOn(event)' onmouseout='cursorLightOff(event)'>Output 2</td></tr>";
+		interactForm+="<tr><td colspan='3'>Bot List<br/><div id='botListArea2'></div></td></tr>";
+		interactForm+="<tr><td colspan='3' class='buttonRed' onclick='createInteraction();newInteractionForm();'>Add Interaction</td></tr></table>";
+		//NOTE: iBList = input Bot List, oBList = output Bot List. 
+		//NOTE: need a '*' for output since it can contain multiple bots. The list will look like "*1*2*5*12*24*", therefore when I need to a remove a bot I have the end points defined by 2 "*", else 1 "*" will make "*2" & "*24" look the same
+		interactForm+="<input id='IOtype' type='hidden' value='0'><input id='iBList1' type='hidden' value='*'><input id='iBList2' type='hidden' value='*'>";
+		interactForm+="<input id='oBList1' type='hidden' value='*'><input id='oBList2' type='hidden' value='*'>";
+		browseAdj("showInteractForm").innerHTML=interactForm;
+		//call the function to display the list of bots
+		showInteractBotList();
+	}
+	else{browseAdj("showInteractForm").innerHTML="";}
+}
+
+function addBotInteractField(e)
+{
+	//get the field type
+	var fieldOI=isIE ? e.srcElement : e.target;
+	//add the bot value to either input or output text field
+	if(fieldOI.getAttribute("id")=="fieldInput1")
+	{
+		browseAdj("iBList1").value="*"+currBotForInteract;
+		fieldOI.innerHTML="Input 1<br/><div style='width:100%;height:1px;background-color:#555555;'></div>";
+		fieldOI.innerHTML+=makeSpecificInteractList(browseAdj("iBList1").value);
+	}
+	else if(fieldOI.getAttribute("id")=="fieldInput2")
+	{
+		browseAdj("iBList2").value="*"+currBotForInteract;
+		fieldOI.innerHTML="Input 2<br/><div style='width:100%;height:1px;background-color:#555555;'></div>";
+		fieldOI.innerHTML+=makeSpecificInteractList(browseAdj("iBList2").value);
+	}
+	else if(fieldOI.getAttribute("id")=="fieldOutput1")
+	{
+		browseAdj("oBList1").value=browseAdj("oBList1").value+currBotForInteract+"*";
+		fieldOI.innerHTML="Output 1<br/><div style='width:100%;height:1px;background-color:#555555;'></div>";
+		fieldOI.innerHTML+=makeSpecificInteractList(browseAdj("oBList1").value);
+	}
+	else if(fieldOI.getAttribute("id")=="fieldOutput2")
+	{
+		browseAdj("oBList2").value=browseAdj("oBList2").value+currBotForInteract+"*";
+		fieldOI.innerHTML="Output 2<br/><div style='width:100%;height:1px;background-color:#555555;'></div>";
+		fieldOI.innerHTML+=makeSpecificInteractList(browseAdj("oBList2").value);
+	}	
+}
+
+function createBotTypeTile(botID)
+{
+	var botPhenotype="<div class='macroPixel' botID='"+botID+"' style='width:"+mPWidth+";height:"+mPWidth+";background-color:"+botTypeList[botID].botColor+";'>&nbsp;</div>";
+	//create display tile for bot
+	var sS=getSlopeInfo(botTypeList[botID]);
+	var botTile="<table class='listElement'><tr><td>"+botPhenotype+"</td><td>Name: "+botTypeList[botID].botName+"<br/>Slope: "+sS+"</td></tr></table>";
+		
+	return botTile;
+}
+
+function makeSpecificInteractList(interactList)
+{
+	var iL2,displayList,botTile,botPhenotype,sS;
+	iL2=interactList.split("*");
+	displayList="<table cellpadding='0' cellspacing='0' border='0'>";
+	for(var i=0;i<iL2.length;i++)
+	{
+		if(iL2[i]!=""){
+			botTile=createBotTypeTile(iL2[i]);
+			displayList+="<tr><td>"+botTile+"</td></tr>";
+		}
+	}
+	displayList+="</table>";
+
+	return displayList;
+}
+
+function createInteraction()
+{
+	var getRxnDisplay;
+	saveInteractStr();
+	getRxnDisplay=displayInteractions();
+	browseAdj("interactListArea").innerHTML=getRxnDisplay;
+	rxnCount++;
+}
+
+function saveInteractStr()
+{
+	var statOfOrder,input1,input2,output1,output2,formatO1,formatO2,inputStr,outputStr;
+	//add this interaction to text string of all interactions
+	//assimilate input strings
+	input1=browseAdj("iBList1").value.substr(1);
+	input2=browseAdj("iBList2").value.substr(1);
+	//determine which input bot # is lower, so the string will be placed in the order "lowest*highest", i.e. "4*7". Reason: to find the interaction, it will be much faster 
+	if(parseInt(input1)<parseInt(input2)){
+		inputStr=input1+"*"+input2;
+		statOfOrder=1;
+	}
+	else{
+		inputStr=input2+"*"+input1;
+		statOfOrder=2;
+	}
+	//assimilate output strings
+	output1=browseAdj("oBList1").value.split("*");
+	output2=browseAdj("oBList2").value.split("*");
+	outputStr="";
+	formatO1="";
+	formatO2="";
+	for(var a=0;a<output1.length;a++){
+		//alert("loop 1 "+a+" of "+output1.length+" - "+output1[a]);
+		if(output1[a]!=""){formatO1+=output1[a]+"*";}
+	}
+	formatO1=formatO1.substr(0,formatO1.length-1);		//this is to remove the last "*"
+	for(var a2=0;a2<output2.length;a2++){
+		//alert("loop 2 "+a2+" of "+output2.length+" - "+output2[a2]);
+		if(output2[a2]!=""){formatO2+=output2[a2]+"*";}	
+	}
+	formatO2=formatO2.substr(0,formatO2.length-1);		//this is to remove the last "*"
+	//since output1 & output2 are matched to input1 & input 2 respectively, use "|" to separate the output1 from output2
+	if(statOfOrder==2){outputStr=formatO2+";"+formatO1;}
+	else{outputStr=formatO1+";"+formatO2;}
+	//add all interactions in the global variable
+	allInteractionStr+="rID"+rxnCount+":"+inputStr+"-"+outputStr+"|";
+	//show all interactions in the interaction menu
+	browseAdj("interactListArea").innerHTML=allInteractionStr;
+}
+
+function displayInteractions()
+{
+	var getRxnTile;
+	var rxnList="<table style='width:300px;'>";
+	//retrieve interaction variable
+	gAIS1=allInteractionStr.substr(1,allInteractionStr.length-2);
+	var getReactions=allInteractionStr.split("|");
+	//splice the text to separate out each reaction
+	for(var r=0;r<getReactions.length;r++)
+	{
+		if(getReactions[r]!=""){
+			getRxnTile=createReactionTile(getReactions[r]);
+			rxnList+="<tr><td>"+getRxnTile+"</td></tr>";
+		}
+	}
+	rxnList+="</table>";
+	return rxnList;
+}
+
+function createReactionTile(getRxnStr)
+{
+	var gOBList1,gOBList2;
+	//getStr: a reaction string
+	var removeID=getRxnStr.split(":");
+	//split into input & output
+	var splitIO=removeID[1].split("-");
+	//get input bots
+	var getInputBots=splitIO[0].split("*");
+	var iB1=createBotTypeTile(getInputBots[0]);
+	var iB2=createBotTypeTile(getInputBots[1]);
+	//get output bots
+	var getOutputs=splitIO[1].split(";");
+	gOBList1=createHorizBotList(getOutputs[0]);		//gOBList = get output bots list
+	var gOBList2=createHorizBotList(getOutputs[1]);
+	//display inputs & outputs
+	var rxnTile="<table><tr><td>"+iB1+"</td><td class='verticalLine'></td><td>"+gOBList1+"</td></tr>";
+	rxnTile+="<tr><td colspan='3'><div style='width:100%;height:1px;background-color:#555555;'></div></td></tr>";
+	rxnTile+="<tr><td>"+iB2+"</td><td class='verticalLine'></td><td>"+gOBList2+"</td></tr>";
+	rxnTile+="<tr><td colspan='3'><div style='width:100%;height:1px;background-color:#5CA4F5;'></div></td></tr></table>";
+		
+	return rxnTile;
+}
+
+function createHorizBotList(botList)
+{
+	var displayBL="";
+	if(botList!=""){
+		var gBL=botList.split("*");
+		//alert("cHBL: "+botList+" | "+gBL);
+		var displayBL="<table><tr>";
+		for(var s=0;s<gBL.length;s++)
+		{
+			getBotTile=createBotTypeTile(gBL[s]);
+			displayBL+="<td>"+getBotTile+"</td>";
+		}
+		displayBL+="</tr></table>";
+	}
+
+	return displayBL;
+}
+
+
+/*
+function newInteractionForm2()
+{
+	var getIBL=showInteractBotList();
+	var interactForm="<table><tr><td id='botInput' IO='0' class='buttonGray' onclick='setInteractInOut(event)' style='background-color:#5CA4F5;'>Input</td><td> | </td><td id='botOutput' OI='1' class='buttonGray' onclick='setInteractInOut(event)'>Output</td></tr>";
+	interactForm+="<tr><td class='vertBotList'></td><td> &rarr; </td><td class='vertBotList'></td></tr>";
+	interactForm+="<tr><td>"+getIBL+"</td></tr>";			//NOTE: ID botListArea already exists in function "botMenu"
+	interactForm+="<tr><td colspan='3' class='buttonRed' onclick='saveInteraction()'>Add Interaction</td></tr></table>";
+	//NOTE: iBList = input Bot List, oBList = output Bot List
+	interactForm+="<input id='IOtype' type='hidden' value='0'><input id='iBList' type='hidden' value='*'><input id='oBList' type='hidden' value='*'>";
+	browseAdj("showInteractForm").innerHTML=interactForm;
+}
+
+function setInteractInOut(e)
+{
+	var IOtype=isIE ? e.srcElement : e.target;
+	//set value to input or output so bots are listed in the correct area
+	browseAdj("IOtype").value=IOtype.getAttribute("IO");
+	//set color of input/output button
+	browseAdj("botInput").style.backgroundColor="#AAAAAA";
+	browseAdj("botOutput").style.backgroundColor="#AAAAAA";
+	IOtype.style.backgroundColor="#5CA4F5";
+}
+
+function addBotToIO(e)
+{
+	var listID,getBotList;
+	var getBot=isIE ? e.srcElement : e.target;
+	//get the IOtype to see if the bots will be added to the input or output list
+	if(parseInt(browseAdj("IOtype").value)==0){listID="iBList";}
+	else{listID="oBList";}
+	getBotList=browseAdj(listID).value;
+	//add bot to the appropriate list - MAKE SURE TO ADD LIKE A CHILD NODE
+	getBotList=getBotList+getBot.getAttribute("botID")+"*";
+	browseAdj(listID).value=getBotList;
+	setIOList(listID);
+}
+
+function setIOList(listID)
+{
+	//get all the bots from the appropriate list
+	//split list
+	var getBL=browseAdj(listID).value.split("*");	//getBL = get Bot List
+	//add all the bots to the list
+	for(var b=0;b<getBL.length;b++)
+	{
+		//get the botID
+		//get the info about the bot
+		//create the list
+	}
+}
+
+function setInteraction(e)
+{
+	
+}
+
+function adjustOutputGrid()
+{
+	
+}
+*/
+
+//ACTION FUNCTION BEGINS
+function startAnimation(animateType)
+{animationTimer=setInterval(function(){animateMatrixSpace(animateType)},100);		//this should run the animation continually at a set interval
+//setTimeout(function(){animateMatrixSpace()},1000);		//this should run the animation one frame at a time - only for testing
+}
+
+function stopButtonClicked()
+{
+	stopClick=true;
+	stopAnimation();
+}
+
+function stopAnimation()
+{
+	if(stopClick && cycleComplete){
+		clearInterval(animationTimer);
+		botNumTracker=0;
+		stopClick=false;
+		cycleComplete=false;
+	}
+}
+
+function placeBot(botNum,oldPos,nextPos)
+{
+	//STEP - clear area bot was previously in
+	fixOldPos(oldPos);
+	//STEP - generate new bot
+	var buildABot=generateBot(botNum);
+	//STEP - add bot to new position
+	var nextBotSpot="TDdisplayPos"+nextPos;
+	browseAdj(nextBotSpot).innerHTML=buildABot;
+	//update position in bot object
+	botArmy[botNum].position=nextPos;
+}
+
+function getNextActiveBot(botID)		//for slow motion animation
+{
+	while(botArmy[botID].active!=1){botID++;}
+	return botID;
+}
+
+function animateMatrixSpace(animateType)
+{
+	if(globalCounter<=stopCounter)
+	{
+	var remainderRun,remainderRise,botRun,botRise;
+	var getBotID,getCurrPosNum,nextY,nextX,nextPos,buildABot,nextBotSpot;
+	var adjSpotX,adjSpotY,adjSpotXY;
+	var botArmyList=new Array();
+	//decide if the animation will be in slow motion or at normal speed.
+	//Slow motion means every bot change will be observed serially, whereas regular speed will refer to all bot changes occurring in parallel
+	//slow motion is for observed what happens step by step (troubleshooting purposes), whereas regular speed is used for actual experimentation
+	cycleComplete=false;
+	if(animateType==0){botNumTracker=getNextActiveBot(botNumTracker);
+	botArmyList=[botArmy[botNumTracker]];}
+	else{botArmyList=botArmy;}
+	//access each bot
+	for(i=0;i<botArmyList.length;i++)
+	{
+		//alert("anim: "+botArmy[botNumTracker].botNum+" of "+botArmy.length+" | isActive: "+botArmyList[i].active+" | gC: "+globalCounter+" | bNT: "+botNumTracker);
+		if(botArmyList[i].active==1){
+			if(botArmyList[i].botMovement==0)		//check adjacent static bots. This would be useful for static interacting 
+			{
+				//check to see if other bots around will affect the current static bot's state
+				checkStaticBotState(botArmyList[i].botNum);
+				placeBot(botArmyList[i].botNum,botArmyList[i].position,botArmyList[i].position);
+			}
+			else
+			{
+				remainderRun=globalCounter%parseInt(botArmyList[i].run);
+				remainderRise=globalCounter%parseInt(botArmyList[i].rise);
+				//botArmyList[botNum]: refers to the information describing the bot, i.e. rise, run, color
+				//browseAdj(botID): refers to the physical bot that is observed in the matrix
+				getBotID="bot"+botArmyList[i].botNum;
+				//get the bot's current position
+				//getCurrPosNum=parseInt(browseAdj(getBotID).parentNode.getAttribute("gridNum"));
+				getCurrPosNum=parseInt(botArmyList[i].position);
+				//CHECK FOR EDGE - check if the bot is at an edge. If it is at an edge, then the bot position will change.
+				checkPosEdge2(botArmyList[i].botNum);
+				//first see if the bot will move. If the bot won't move, then there is no point running through the rest of the script
+				//it is important to know the direction the bot is going in, therefore use "rise/absolute(rise)" just to find the sign. 
+				if(remainderRun==0){botRun=parseInt(botArmyList[i].run)/Math.abs(parseInt(botArmyList[i].run));}
+				else{botRun=0;}
+				if(remainderRise==0){botRise=parseInt(botArmyList[i].rise)/Math.abs(parseInt(botArmyList[i].rise));}
+				else{botRise=0;}
+				if((botRun!=0) || (botRise!=0))
+				{
+					//generate the bot design for the next position
+					buildABot=generateBot(botArmyList[i].botNum);
+					//CHECK FOR COLLISION - see if a bot resides in the nextPosition, then correct botRun & botRise
+					correctForCollision2(botArmyList[i].botNum,botRise,botRun);
+					if(botArmyList[i].active==1)
+					{
+						if(botRise!=0){botRise=parseInt(botArmyList[i].rise)/Math.abs(parseInt(botArmyList[i].rise));}
+						if(botRun!=0){botRun=parseInt(botArmyList[i].run)/Math.abs(parseInt(botArmyList[i].run));}
+						//recalculate next position
+						nextY=botRise*numBoxX;
+						nextX=botRun;
+						nextPos=getCurrPosNum+nextY+nextX;
+						placeBot(botArmyList[i].botNum,getCurrPosNum,nextPos);
+						/*
+						//Data recording
+						//recordBotSpeeds();
+						*/
+					}
+				}
+			}
+		}
+		botNumTracker++;
+	}
+	//global counter to count for bots
+	//for slow motion, once all the bots have been adjusted to their next state, then increment globalCounter
+	if(botNumTracker==botArmy.length){
+		globalCounter++;
+		botNumTracker=0;
+		cycleComplete=true;
+	}
+	var displayCounter="bot: "+botNumTracker+" of "+botArmy.length+"<br/>"+globalCounter;
+	browseAdj("counter").innerHTML=displayCounter;
+
+	//check if stop button was clicked - this is to make sure a full cycle of animating all bots has been completed
+	if(stopClick){stopAnimation();}
+	}
+	else
+	{
+		stopClick=true;
+		cycleComplete=true;
+		stopAnimation();
+	}
+}
+
+function returnSurroundingPos(currPos)
+{
+	currPos=parseInt(currPos);
+	//get all positions
+	var posLeft=currPos-1;
+	var posRight=currPos+1;
+	var posTop=currPos-numBoxX;
+	var posBottom=currPos+numBoxX;
+	var posTL=currPos-numBoxX-1;
+	var posTR=currPos-numBoxX+1;
+	var posLL=currPos+numBoxX-1;
+	var posLR=currPos+numBoxX+1;
+	//check if the position is at any edge
+	var currPosID="TDdisplayPos"+currPos;
+	var getCurrPos=browseAdj(currPosID);
+	if(getCurrPos.getAttribute("edgeTop")!=null){											//bot must go down
+		posTop=-1;
+		posTL=-1;
+		posTR=-1;
+	}	
+	else if(getCurrPos.getAttribute("edgeBottom")!=null){									//bot must go up
+		posBottom=-1;
+		posLL=-1;
+		posLR=-1;
+	} 
+
+	if(getCurrPos.getAttribute("edgeLeft")!=null){											//bot must go right
+		posLeft=-1;
+		posTL=-1;
+		posLL=-1;
+	}
+	else if(getCurrPos.getAttribute("edgeRight")!=null){									//bot must go left
+		posRight=-1;
+		posTR=-1;
+		posLR=-1;
+	}
+	
+	//add all positions to an array
+	var allPosArray=[posLeft,posRight,posTop,posBottom,posTL,posTR,posLL,posLR];
+	var finalPosArray=new Array();
+	for(var i=0;i<allPosArray.length;i++){
+		if(allPosArray[i]!=-1){finalPosArray.push(allPosArray[i]);}
+	}
+	//return the array
+	return finalPosArray;
+}
+
+function checkStaticBotState(botNum)
+{
+	//csID = current spot ID
+	var csID,checkCurrSpot,gBN2;
+	//STEP - find all static bots around current static bot
+	//put all positions in an array, search through array, & return static bots
+	var surroundArea=returnSurroundingPos(botArmy[botNum].position);
+	var sSBots=new Array();		//sSBots = surrounding static bots
+	for(var i=0;i<surroundArea.length;i++)
+	{
+		csID="TDdisplayPos"+surroundArea[i];
+		//first see if there is a bot on the top/bottom side
+		if(browseAdj(csID).firstChild.getAttribute("botNum")){
+			if(botArmy[botNum].botMovement==0){
+				gBN2=parseInt(browseAdj(csID).firstChild.getAttribute("botNum"));
+				if(botArmy[gBN2].botMovement==0){sSBots.push(gBN2);}
+			}
+		}
+	}
+	//STEP - check if current state is a reaction, else keep the bot the same
+	for(var j=0;j<sSBots.length;j++)
+	{
+		checkBotsInReaction(botNum,sSBots[j],0,0);
+	}
+}
+
+function correctForCollision2(bot1,getRise,getRun)
+{
+	var bot2,getSpecies1,getSpecies2;
+	var checkChange=0;
+	//NOTE: variables "bot1" & "bot2" are the numbered version of the bot (botNum)
+	//NOTE2: I don't think I need to distinguish whether bot1 is coming from the left, right, top or bottom with respect
+	//to bot 2, but I'm going to do it anyways for the sake of clarity.
+	var bot1Pos=parseInt(botArmy[bot1].position);
+	//find bots in direction of movement
+	//it is important to know the direction the bot is going in, therefore use "rise/absolute(rise)" just to find the sign. 
+	var nextY=parseInt(getRise)*numBoxX;
+	var nextX=parseInt(getRun);
+	var numAdjSpotX=bot1Pos+nextX;
+	adjSpotX="TDdisplayPos"+numAdjSpotX;
+	var numAdjSpotY=bot1Pos+nextY;
+	adjSpotY="TDdisplayPos"+numAdjSpotY;
+	var numAdjSpotXY=bot1Pos+nextX+nextY;
+	adjSpotXY="TDdisplayPos"+numAdjSpotXY;
+	//first see if there is a bot on the top/bottom side
+	if((browseAdj(adjSpotX).firstChild.getAttribute("botNum") && bot1Pos!=numAdjSpotX) || (browseAdj(adjSpotY).firstChild.getAttribute("botNum") && bot1Pos!=numAdjSpotY))
+	{
+		if(browseAdj(adjSpotX).firstChild.getAttribute("botNum") && bot1Pos!=numAdjSpotX){
+			bot2=parseInt(browseAdj(adjSpotX).firstChild.getAttribute("botNum"));
+			//DELETE SOON - browseAdj("TESTSTR").innerHTML+="Bot1: "+bot1+" & Pos: "+bot1Pos+" | Bot2: "+bot2+" & AdjPosX: "+adjSpotX+" - "+getRise+":"+getRun+"<br/>";
+			checkBotsInReaction(bot1,bot2,1,0);
+			checkChange=1;
+		}
+		if(browseAdj(adjSpotY).firstChild.getAttribute("botNum") && bot1Pos!=numAdjSpotY){
+			bot2=parseInt(browseAdj(adjSpotY).firstChild.getAttribute("botNum"));
+			//DELETE SOON - browseAdj("TESTSTR").innerHTML+="Bot1: "+bot1+" & Pos: "+bot1Pos+" | Bot2: "+bot2+" & AdjPosY: "+adjSpotY+" - "+getRise+":"+getRun+"<br/>";
+			checkBotsInReaction(bot1,bot2,0,1);
+			checkChange=1;
+		}
+	}
+	else if(browseAdj(adjSpotXY).firstChild.getAttribute("botNum") && bot1Pos!=numAdjSpotXY){
+		bot2=parseInt(browseAdj(adjSpotXY).firstChild.getAttribute("botNum"));
+		//DELETE SOON - browseAdj("TESTSTR").innerHTML+="Bot1: "+bot1+" & Pos: "+bot1Pos+" | Bot2: "+bot2+" & AdjPosXY: "+adjSpotXY+" - "+getRise+":"+getRun+"<br/>";
+		checkBotsInReaction(bot1,bot2,1,1);
+		checkChange=1;
+	}
+	//double check the edge to make sure the new slope doesn't push the bot off the edge of the matrix
+	if(checkChange>0){checkPosEdge2(bot1);}
+}
+
+function checkBotsInReaction(bot1,bot2,changeX,changeY)
+{
+	//STEP - compare the bot #s, need the correct order for the input string
+	var storeBotID,inputStr,getRxnStr,getInputBots,getOutputBots,resultOfRxn;
+	//get the bot species of each bot
+	var getSpecies1=botArmy[bot1].botSpecies;
+	var getSpecies2=botArmy[bot2].botSpecies;
+	//ordering the bots in storeBotID is required since the for loop replacing output bots with input bots is position dependent. Refer to the order of reaction botTypes in func. saveInteractStr()
+	if(getSpecies1>getSpecies2){storeBotID=[bot2,bot1];}
+	else{storeBotID=[bot1,bot2];}
+	if(parseInt(getSpecies1)<parseInt(getSpecies2)){inputStr=":"+getSpecies1+"*"+getSpecies2+"-";}
+	else{inputStr=":"+getSpecies2+"*"+getSpecies1+"-";}
+	//STEP - search for string
+	var searchRxn=allInteractionStr.indexOf(inputStr);
+	if(searchRxn>=0)		//if not matches found, search function will return -1
+	{
+		//extract the output bots
+		getRxnStr=findReaction(allInteractionStr,"|",inputStr);
+		var removeRxnID=getRxnStr.split(":");
+		var separateIOBots=removeRxnID[1].split("-");
+		var getInputBots=separateIOBots[0].split("*");
+		var getROB=separateIOBots[1].split(";");		//getROB = get respective Output bots
+		//get general direction for each set of bots
+		var slopeTrends=directionOfSlope(bot1,bot2,changeX,changeY);
+		//inactivate the input bots
+		var getOutputBots="";
+		//this loop is to remove the bots in the reaction from botArmy array (not botTypeArmy), & add bots to the removed bots position using the output reaction
+		for(var a=0;a<storeBotID.length;a++)
+		{
+			inactivateBot(storeBotID[a]);
+			//remove bot from position
+			fixOldPos(botArmy[storeBotID[a]].position);
+			//set positions of new output bots
+			//positionOutputBots(outputBots,getPos,slopeTrends)
+			positionOutputBots(getROB[a],botArmy[storeBotID[a]].position,slopeTrends[a]);
+		}
+		retrieveBots();	
+	}
+	else{checkCollisionType(bot1,bot2,changeX,changeY);}
+}
+
+function directionOfSlope(bot1,bot2,changeX,changeY)
+{
+	//need to find out the general direction the bot will be moving in
+	var slopeTrend1,slope2Trend2,x1,y1,x2,y2;
+	var multiplyX,multiplyY;
+	var sumStat;
+	sumStat=parseInt(botArmy[bot1].botMovement)+parseInt(botArmy[bot2].botMovement);		//for botMovement, 0=stationary, 1=moving
+	//if sum is 1, then one of the bots is stationary
+	if(sumStat==0)
+	{
+		x1=0;
+		y1=0;
+		x2=0;
+		y2=0;
+	}
+	else if(sumStat==1)	//if one of the bots are stationary, then the slope trend of the moving bot is the opposite of itself & the slope trend of the stationary bot is the same as the moving bot 
+	{
+		if(botArmy[bot1].botMovement==0){		//bot1 is stationary
+			x1=botArmy[bot2].run/(Math.abs(botArmy[bot2].run));
+			y1=botArmy[bot2].rise/(Math.abs(botArmy[bot2].rise));
+			x2=-1*x1;
+			y2=-1*y1;
+		}
+		else{		//bot2 is stationary
+			x2=botArmy[bot1].run/(Math.abs(botArmy[bot1].run));
+			y2=botArmy[bot1].rise/(Math.abs(botArmy[bot1].rise));
+			x1=-1*x2;
+			y1=-1*y2;
+		}	
+	}
+	else if(sumStat==2){
+		collisionChangeSlope(bot1,bot2,changeX,changeY);
+		x1=botArmy[bot1].run/(Math.abs(botArmy[bot1].run));
+		y1=botArmy[bot1].rise/(Math.abs(botArmy[bot1].rise));
+		x2=botArmy[bot2].run/(Math.abs(botArmy[bot2].run));
+		y2=botArmy[bot2].rise/(Math.abs(botArmy[bot2].rise));
+	}
+	slopeTrend1=x1+"*"+y1;		//slopeTrend=run trend * rise trend
+	slopeTrend2=x2+"*"+y2;
+
+	return [slopeTrend1, slopeTrend2];
+}
+
+//strOI = string to search in, strToFind = string to find in strOI
+function findReaction(strOI,delimiter,strToFind)
+{
+	var rxnStr;
+	//split reaction strings
+	var splitStr=strOI.split(delimiter);
+	//find index that contains this reaction
+	for(var i=0;i<splitStr.length;i++)
+	{
+		if(splitStr[i]!=""){
+		if(splitStr[i].indexOf(strToFind)>=0)
+		{
+			rxnStr=splitStr[i];
+			break;
+		}
+		}
+	}
+	//separate input & output bots
+	return rxnStr;
+}
+
+function positionOutputBots(outputBots,getPos,slopeTrends)
+{
+	var getSlopes;
+	//outputBots are separated by "*", therefore split into "*"
+	if(outputBots!=""){		//if string is empty, then no output bots will replace the old bots. Else, the appropriate output bots will replace the old bots
+		var getIOB=outputBots.split("*");		//getIOB = get individual output bots
+		var getXYTrends=slopeTrends.split("*");
+		for(var x=0;x<getIOB.length;x++)
+		{
+			//need to create random yet unique slope that corresponds to general X & Y direction
+			if(botTypeList[getIOB[x]].botMovement!=0){getSlopes=generateSerialSlope(getXYTrends[0],getXYTrends[1]);}
+			else{getSlopes=[0,0];}
+			//create output bot
+			createAndGenBot(getIOB[x],getPos,getSlopes[0],getSlopes[1],1);
+		}	
+	}
+}
+
+function generateSerialSlope(xTrend,yTrend)		//this is an alternative to func. generateRandomSlope as to generate, different consistent slopes for each bot
+{
+	var getRise,getRun;
+	//check to see whether x or y will be incremented
+	if(yIteration > xIteration)
+	{
+		getRise=(yIteration%yRange+1)*yTrend;		//add 1 so rise is never zero
+		getRun=xSlopeCount*xTrend;
+		//adjust slope for next round of slopes
+		xSlopeCount++;
+		if(xSlopeCount>xRange)
+		{
+			xSlopeCount=1;
+			xIteration++;
+		}
+	}
+	else
+	{
+		getRise=ySlopeCount*xTrend;
+		getRun=(xIteration%xRange+1)*yTrend;		//add 1 so run is never zero
+		//adjust slope for next round of slopes
+		ySlopeCount++;
+		if(ySlopeCount>yRange)
+		{
+			ySlopeCount=1;
+			yIteration++;
+		}
+	}
+	
+	return [getRise,getRun];
+}
+
+function generateRandomSlope(xTrend,yTrend)
+{
+	//generate random slopes
+	var getRise=Math.ceil(Math.random()*yRange);
+	getRise=yTrend*getRise;
+	var getRun=Math.ceil(Math.random()*xRange);
+	getRun=xTrend*getRun;
+
+	return [getRise,getRun];
+}
+
+//this function accounts for collisions between 2 stationary bots, 1 moving bot & 1 stationary bot, OR 2 moving bots
+function checkCollisionType(bot1,bot2,changeX,changeY)
+{
+	//see if bot is in reaction
+	
+	var sumStat;
+	sumStat=parseInt(botArmy[bot1].botMovement)+parseInt(botArmy[bot2].botMovement);		//for botMovement, 0=stationary, 1=moving
+	//if sum is 1, then one of the bots is stationary
+	if(sumStat==1)
+	{
+		if(botArmy[bot1].botMovement==0){collisionWithStaticObject(bot2,bot1,changeX,changeY);}
+		else{collisionWithStaticObject(bot1,bot2,changeX,changeY);}
+	}
+	else if(sumStat==2){collisionChangeSlope(bot1,bot2,changeX,changeY);}
+	//else if sumStat is 2, then both bots are moving
+}
+
+function collisionWithStaticObject(movingBot,staticBot,changeX,changeY)
+{
+	if(changeX>0){botArmy[movingBot].run=botArmy[movingBot].run*-1;}
+	if(changeY>0){botArmy[movingBot].rise=botArmy[movingBot].rise*-1;}
+	botArmy[staticBot].run=0;
+	botArmy[staticBot].rise=0;
+}
+
+function collisionChangeSlope(bot1,bot2,changeX,changeY)
+{
+	//function record collision
+	//recordCollisionEvent(bot1,bot2);
+	var multiplyX,multiplyY,temp;
+	if(changeX>0){
+		multiplyX=(botArmy[bot1].run)*(botArmy[bot2].run);
+		//if multiplyX > 0, then both the signs are the same, else if multiplyX < 0 then the signs are different
+		if(multiplyX > 0){
+			temp=botArmy[bot1].run;
+			botArmy[bot1].run=botArmy[bot2].run;
+			botArmy[bot2].run=temp;
+		}
+		else{
+			temp=botArmy[bot1].run;
+			botArmy[bot1].run=botArmy[bot2].run;
+			botArmy[bot2].run=temp;
+		}
+	}
+	if(changeY>0){
+		//check if signs for both bots are the same by multiplying them together
+		multiplyY=(botArmy[bot1].rise)*(botArmy[bot2].rise);
+		//if multiplyY > 0, then both the signs are the same, else if multiplyY < 0 then the signs are different
+		if(multiplyY > 0){
+			temp=botArmy[bot1].rise;
+			botArmy[bot1].rise=botArmy[bot2].rise;
+			botArmy[bot2].rise=temp;
+		}
+		else{
+			temp=botArmy[bot1].rise;
+			botArmy[bot1].rise=botArmy[bot2].rise;
+			botArmy[bot2].rise=temp;
+		}
+	}
+	
+	if(botArmy[bot1].position==botArmy[bot2].position){		//for now, always shift to the left to reduce the amount of unwanted variability
+		//get position of bot
+		var getCurrPosID=botArmy[botNum].position;
+		getCurrPosID="TDdisplayPos"+getCurrPosID;
+		var getCurrPos=browseAdj(getCurrPosID);
+		if(getCurrPos.getAttribute("edgeLeft")!=null)
+		{botArmy[bot1].position=parseInt(botArmy[bot1].position)+1;}				//bot must go right
+		else{botArmy[bot1].position=parseInt(botArmy[bot1].position)-1;}			//bot must go left
+	}
+}
+
+function checkPosEdge2(botNum)
+{
+	//get bot slope
+	var getBotID="bot"+botNum;
+	var getRise=parseInt(botArmy[botNum].rise);
+	var getRun=parseInt(botArmy[botNum].run);
+	//get position of bot
+	var getCurrPosID=botArmy[botNum].position;
+	getCurrPosID="TDdisplayPos"+getCurrPosID;
+	var getCurrPos=browseAdj(getCurrPosID);
+	//it is important to know the direction the bot is going in, therefore use "rise/absolute(rise)" just to find the sign. 
+	var signY=parseInt(botArmy[botNum].rise)/Math.abs(parseInt(botArmy[botNum].rise));
+	var signX=parseInt(botArmy[botNum].run)/Math.abs(parseInt(botArmy[botNum].run));
+	
+	if(getCurrPos.getAttribute("edgeTop")!=null){											//bot must go down
+		if(signY < 0){botArmy[botNum].rise=Math.abs(getRise);}
+	}	
+	else if(getCurrPos.getAttribute("edgeBottom")!=null){									//bot must go up
+		if(signY > 0){botArmy[botNum].rise=Math.abs(getRise)*-1;}
+	} 
+
+	if(getCurrPos.getAttribute("edgeLeft")!=null){											//bot must go right
+		if(signX < 0){botArmy[botNum].run=Math.abs(getRun);}
+	}
+	else if(getCurrPos.getAttribute("edgeRight")!=null){									//bot must go left
+		if(signX > 0){botArmy[botNum].run=Math.abs(getRun)*-1;}
+	}
+}
+
+/*
+function checkPosEdge(botNum)
+{
+	var getRise=parseInt(botArmy[botNum].rise);
+	var getRun=parseInt(botArmy[botNum].run);
+	var getBotID="bot"+botNum;
+	//var getCurrPos=browseAdj(getBotID).parentNode;
+	var getCurrPosID=botArmy[botNum].position;
+	getCurrPosID="TDdisplayPos"+getCurrPosID;
+	var getCurrPos=browseAdj(getCurrPosID);
+	if(getCurrPos.getAttribute("edgeTop")!=null){botArmy[botNum].rise=Math.abs(getRise);}	//bot must go down
+	else if(getCurrPos.getAttribute("edgeBottom")!=null){botArmy[botNum].rise=Math.abs(getRise)*-1;} 	//bot must go up
+	if(getCurrPos.getAttribute("edgeLeft")!=null){botArmy[botNum].run=Math.abs(getRun);}	//bot must go right
+	else if(getCurrPos.getAttribute("edgeRight")!=null){botArmy[botNum].run=Math.abs(getRun)*-1;} 	//bot must left
+	//double check the position so the bot doesn't move out of the matrix
+	doubleCheckPosEdge(botNum);
+}
+
+function doubleCheckPosEdge(botNum)
+{
+	var getBotID="bot"+botNum;
+	//var getCurrPosNum=parseInt(browseAdj(getBotID).parentNode.getAttribute("gridNum"));
+	var getCurrPosNum=parseInt(botArmy[botNum].position);
+	//browseAdj("testBox").innerHTML+="dCPE1: count - "+globalCounter+" & bot - "+botNum+"<br/>";
+	//it is important to know the direction the bot is going in, therefore use "rise/absolute(rise)" just to find the sign. 
+	var nextY=(parseInt(botArmy[botNum].rise)/Math.abs(parseInt(botArmy[botNum].rise)))*numBoxX;
+	var nextX=parseInt(botArmy[botNum].run)/Math.abs(parseInt(botArmy[botNum].run));
+	//browseAdj("testBox").innerHTML+="dCPE2: count - "+globalCounter+" & bot - "+botNum+"<br/>";
+	var nextPos=getCurrPosNum+nextY+nextX; 
+	var totalTiles=numBoxX*numRowsY;
+	if(!(nextPos < totalTiles) || !(nextPos >= 0)){checkPosEdge(botNum);}
+	//if(!(nextPos < totalTiles)){checkPosEdge(botNum);}
+	//if(!(nextPos >= 0)){checkPosEdge(botNum);}
+	//THIS PART OF THE FUNCTION IS BEING CALLED TWICE!!!! WHY?!?!?!?
+	//ANS: only happens when the checkPosEdge() function is called again. This could be that since the rest of the 
+	//function hasn't executed it is being held in a queue, waiting to be called again. A way to test this is to add a "randomNumGenerator"
+	//that gives a random # per run & see if the 2 corresponding random #s show up per run.
+	//alert(botNum+": dCPE 9 - R: "+randNum);
+	//alert(botNum+": dCPE 10  - R: "+randNum); 
+}
+*/
+
+function fixOldPos(oldPosNum)
+{
+	var dispID="displayPos"+oldPosNum;
+	var TDdispID="TD"+dispID;
+	browseAdj(TDdispID).innerHTML="<div id='"+dispID+"' gridNum="+oldPosNum+" class='macroPixel' style='width:"+mPWidth+";height:"+mPWidth+";'>&nbsp;</div>";
+}
+
+//FUNCTIONS TO RECORD DATA
+//Delimiter text: event type:event type value:bot #:frame #
+//event type = concentration, collision, speed, etc.
+//event type value = the value for that specific event type. For concentration, it would be the concentration, for collision, it would be the # of collisions at a specific time
+//bot # or group type: the specific bot # ID or the group the bot belongs to
+//frame #: the globalCounter which keeps track of time with respect to the # of frames
+//TYPE OF INFORMATION REQUIRED FOR EACH EVENT TYPE:
+//for concentration - the group, time
+//for collision: first bot in collision, second bot in collision, time
+//for speed: slope (rise/run), bot num, & the time
+
+//recordConcentration() located in following func: createAndGenBot, updateBot, inactivateBot
+function recordConcentration(popType,eventVal)
+{
+	//generate the delimiter text: event type:event type value:bot #:frame #
+	//note: "c" means the concentration of the population type aka "popType"
+	var concenText="c:"+eventVal+":"+popType+":"+globalCounter+";";
+	//add it to the "rawData" hidden input
+	browseAdj("rawData").value+=concenText;
+}
+
+//recordCollisionEvent() located in following func: collisionChangeSlope
+function recordCollisionEvent(bot1,bot2)
+{
+	//get the bots involved in the collision
+	//generate the delimiter text: event type:event type value:bot #:frame #
+	var textBot1="b:1:"+bot1+":"+globalCounter+";";
+	var textBot2="b:1:"+bot2+":"+globalCounter+";";
+	//add it to the "rawData" hidden input
+	browseAdj("rawData").value+=textBot1+""+textBot2;
+}
+
+//recordBotSpeeds() located in following func: animateMatrixSpace
+function recordBotSpeeds()
+{
+	var getBotNum,rise,run,botSpeed;
+	//loop through all bots
+	var allBots=document.getElementsByName("bot");
+	for(var x=0;x<allBots.length;x++)
+	{
+		//get botNum
+		getBotNum=allBots[x].getAttribute("botNum");
+		//get bot info
+		rise=parseInt(botArmy[getBotNum].rise);
+		run=parseInt(botArmy[getBotNum].run);
+		botSpeed=rise/run;
+		browseAdj("rawData").value+="s:"+botSpeed+":"+getBotNum+":"+globalCounter+";";	
+	}
+}
+
+function getRawData(e)
+{
+	mouseOrig(e);
+	var rawData=browseAdj("rawData").value;
+	var dataStrBox="<table class='popUpBox' style='position:absolute;left:"+xOrig+";top:"+yOrig+";z-index:100;background-color:#333333;'>";
+	dataStrBox+="<tr><td>Data String</td><td class='closeX' onclick='closePopUps()'>X</td></tr>";
+	dataStrBox+="<tr><td colspan='2'><textarea class='textField'>"+rawData+"</textarea></td></tr></table>";
+	browseAdj("popUpArea").innerHTML=dataStrBox;
+}
+
+function setAnalysisParameters(e)
+{
+	mouseOrig(e);
+	var rawData=browseAdj("rawData").value;
+	var dataStrBox="<table class='popUpBox' style='position:absolute;left:"+xOrig+";top:"+yOrig+";z-index:100;background-color:#333333;'>";
+	dataStrBox+="<tr><td>Data Analysis</td><td class='closeX' onclick='closePopUps()'>X</td></tr>";
+	dataStrBox+="<tr><td colspan='2'>Frame Binning&nbsp;&nbsp;&nbsp;<input id='frameBin' class='textField' type='text' size='3'/></td></tr>";
+	dataStrBox+="<tr><td colspan='2'>Excel Table<br/><div id='excelTable' onclick='selectText(this.id)'></div></td></tr>";
+	dataStrBox+="<tr><td colspan='2' class='buttonGray' style='background-color:#5CA4F5;' onclick='analyzeRawData();'>Submit</td></tr></table>";
+	//dataStrBox+="<tr><td><textarea class='textField'>"+rawData+"</textarea></td></tr></table>";
+	browseAdj("popUpArea").innerHTML=dataStrBox;
+}
+
+function arrayOfZeroes(row,col)
+{
+	var newArray=new Array(row);
+	//make each row of the array another array, thus making this a 2D array
+	for(a=0;a<row;a++)
+	{
+		newArray[a]=new Array(col);
+	}
+	for(x=0;x<newArray.length;x++)
+	{
+		for(y=0;y<newArray[x].length;y++)
+		{
+			newArray[x][y]=0;
+		}
+	}
+
+	return newArray;
+}
+
+function analyzeRawData()
+{
+	var frameBin=browseAdj("frameBin").value;
+	if(frameBin==""){frameBin=1;}
+	//initialize raw data
+	//types of events: "b" - bump or collision, "c" - concentration, "s" - speed	
+	//STEP 1 - ADD PRESENCE OF ALL BOTS FOR EACH EVENT TYPE BEING RECORDED
+	//recordConcentration is used here so function "findDistinctCols" will have all the bots that exist for this experiment. Without this line, a "NaN" error occurs in the spreadsheet for in between bots that don't exist in the matrix space.
+	//For example, say I have bots 1, 2, 3, & 4. If I put down bots 1 & 2, the spreadsheet will show concentrations for 1 & 2 without "NaN". However, if I put down bot 3 & there is no instance of bots 1 & 2, then the "NaN" will show up in the spreadsheet.
+	//This is because the function "DistinctCols" only reads from the rawData, & if the existence of other bots its not record the function will not know about the other bots.
+	//NOTE: the event value (2nd parameter) is zero because this is just record the existence of this botType, there is no addition to the grid.
+	for(var a=0;a<botTypeList.length;a++)
+	{
+		recordConcentration(botTypeList[a].botID,0);	//NOTE: it doesn't matter that this is being added to the end of the rawData, as long as the existence of the botType is recorded.
+	}
+	//types of events: "b" - bump or collision, "c" - concentration, "s" - speed	
+	//separate concentration data from raw data
+	var concenChangesArray=makeArrayOfChanges(frameBin,globalCounter,"c");
+	var concenSumArray=makeArrayOfSums(frameBin,concenChangesArray);
+	var concenAvgArray=makeArrayOfAverages(frameBin,concenSumArray);
+	//separate collision data from raw data
+	//var collisionSumArray=makeArrayOfSums(frameBin,globalCounter,"b");
+	//var collisionAvgArray=makeArrayOfAverages(frameBin,collisionSumArray);
+	//collisionSumArray=normalize2DArray(collisionSumArray,0);
+	//separate speed data from raw data
+	//var speedSumArray=makeArrayOfSums(frameBin,globalCounter,"s");
+	//var speedAvgArray=makeArrayOfAverages(frameBin,speedSumArray);
+	//speedSumArray=normalize2DArray(speedSumArray,0);	
+	//alert("aRD2: "+collisionSumArray.length+" | "+collisionSumArray[0].length);
+	//initialize the header & array to display the data in a table
+	var numOfBins=Math.ceil(globalCounter/frameBin)+1;	//ERROR FIXED: need to at "+1" as the "frameNum=Math.ceil(datum[3]/frameBin);" below will go above the index of the variable
+	initiateTableArray(numOfBins);
+	makeArrayOfTD(concenChangesArray,"Concen. change of group",true);
+	makeArrayOfTD(concenSumArray,"Concen. of group",true);
+	makeArrayOfTD(concenAvgArray,"Avg Concen. of group",true);
+	//makeArrayOfTD(speedSumArray,"Sum of Speed");
+	//makeArrayOfTD(speedAvgArray,"Avg of Speed");
+	displayArrays();
+}
+
+function normalize2DArray(arrayOI,typeOfNorm)
+{
+	//NOTE: assumed that arrayOI is a 2D array
+	//find largest value in array
+	var maxValOI;
+	var absMax=1;
+	var maxValArray=new Array();
+	//initialize maxValArray
+	for(var m=0;m<arrayOI[0].length+1;m++){maxValArray[m]=1;}
+	//find the max value for each bot
+	for(var a=0;a<arrayOI.length;a++)
+	{
+		for(var b=0;b<arrayOI[a].length;b++)
+		{
+			//selected index b for maxValArray because the maxVal is being compared to each bot in a specific frame, where index "a" is the frame & index "b" is the bot
+			if(maxValArray[b]<Math.abs(arrayOI[a][b])){maxValArray[b]=Math.abs(arrayOI[a][b]);}
+		}
+	}
+	//find absolute max value
+	for(var c=0;c<maxValArray.length;c++){
+		if(absMax<maxValArray[c]){absMax=maxValArray[c];}
+	}
+	//divide all the values in the array
+	for(var d=0;d<arrayOI.length;d++)
+	{
+		//alert("loop 1: "+d+" of "+arrayOI.length);
+		for(var e=0;e<arrayOI[d].length;e++)
+		{
+			//if typeOfNorm==1, then each bot is normalized by its own max, ELSE the entire array is normalized by a global max value
+			//alert("loop 2.0: "+e+" of "+arrayOI[e].length);
+			if(typeOfNorm==1){maxValOI=maxValArray[e];}
+			else{maxValOI=absMax;}
+			arrayOI[d][e]=arrayOI[d][e]/maxValOI;
+		}
+	}
+	return arrayOI;
+}
+
+function findDistinctCols(identifier)
+{
+	var datum;
+	var numOfCategories=0;
+	var trackCategories=new Array();
+	var rawData1=browseAdj("rawData").value;
+	var rawData2=rawData1.split(";");
+	//using the identifier, find the # of different columns, where each column is a recording from a bot or a group
+	for(b=0;b<rawData2.length-1;b++)		//the last data string is a null since the "split" command takes information after the last semicolon
+	{
+		datum=rawData2[b].split(":");
+		if(datum[0]==identifier)
+		{
+			trackCategories.push(datum[2]);
+		}
+	}
+	//sort the array
+	trackCategories=trackCategories.sort();
+	if(trackCategories.length>0){		//need to make sure there are categories that exist, else what's the point of count categories.
+		numOfCategories++;	 	//Also, +1 to numOfCategories to include the existence of the first category since the subsequent for loop only considers the change between categories
+		for(var c=0;c<trackCategories.length-1;c++)
+		{
+			 if(trackCategories[c+1]!=trackCategories[c])
+			 {
+				 numOfCategories++;
+			 }
+		}
+	}
+		
+	return numOfCategories;
+}
+
+function makeArrayOfChanges(frameBin,row,identifier)
+{
+	var datum,eventVal,colID,frameNum;
+	var rawData1=browseAdj("rawData").value;
+	var rawData2=rawData1.split(";");
+	var numOfBins=Math.ceil(row/frameBin)+1;	//ERROR FIXED: need to at "+1" as the "frameNum=Math.ceil(datum[3]/frameBin);" below will go above the index of the variable
+	//find # of columns - each column should be a different bot # or group ID
+	var col=findDistinctCols(identifier);
+	//make an array of zeroes
+	var changesArray=arrayOfZeroes(numOfBins,col);
+	//alert("aRD1.5 - "+rawData2.length+" | collisionArray:"+collisionData.length+" | "+collisionData[0].length);	
+	//create the sum array
+	for(b=0;b<rawData2.length-1;b++)		//the last data string is a null since the "split" command takes information after the last semicolon
+	{
+		datum=rawData2[b].split(":");
+		//0 - event type, 1 - event type value, 2 - bot # or group ID, 3 - frame #
+		//USING THE EVENT TYPE, DATUM FOR DIFFERENT TYPES OF EVENTS CAN BE SORTED!!!
+		if(datum[0]==identifier)
+		{
+			eventVal=parseInt(datum[1]);
+			colID=datum[2];
+			frameNum=Math.ceil(datum[3]/frameBin);
+			//alert("mAS4: "+frameNum+" of "+numOfBins+" | LOOP: "+b+" of "+rawData2.length);
+			changesArray[frameNum][colID]=parseInt(changesArray[frameNum][colID])+eventVal;
+		}
+	}
+	//the new way to save data is time point 0 is the initial condition, & the subsequent values are the changes that occur during the experiment, where +# is a positive change & -# is a negative change
+	return changesArray;
+}
+
+function makeArrayOfSums(frameBin,changesArray)
+{
+	var sumArray=arrayOfZeroes(changesArray.length,changesArray[0].length);
+	for(i=0;i<changesArray.length;i++)
+	{
+		for(j=0;j<changesArray[i].length;j++)
+		{
+			sumArray[i][j]=sumValInCol(i,j,changesArray);
+		}
+	}
+	return sumArray;
+}
+
+function sumValInCol(row,col,arrayOI)
+{
+	//sum all values in a column
+	var sum=0;
+	for(var x=0;x<=row;x++)
+	{
+		sum=sum+arrayOI[x][col];
+	}
+
+	return sum;
+}
+
+function makeArrayOfAverages(frameBin,sumArray)
+{
+	var avgArray=arrayOfZeroes(sumArray.length,sumArray[0].length);
+	for(i=0;i<sumArray.length;i++)
+	{
+		for(j=0;j<sumArray[i].length;j++)
+		{
+			avgArray[i][j]=sumArray[i][j]/frameBin;
+		}
+	}
+	return avgArray;
+}
+
+function initiateTableArray(arraySize)
+{
+	header="";
+	tableArray=new Array(arraySize);
+	for(var w=0;w<tableArray.length;w++){tableArray[w]="";}
+}
+
+function makeArrayOfTD(arrayOI,title,addName)
+{
+	//need global Array variable to store each table
+	//global variable header keeps track of what the data means in each column
+	for(v=0;v<arrayOI[0].length;v++)
+	{
+		if(addName){header+="<td>"+title+" "+v+" :: Name: "+botTypeList[v].botName+"</td>";}
+		else{header+="<td>"+title+" "+v+"</td>";}
+	}
+	//global variable tableArray keeps data from each array recorded into <td> cells
+	for(var x=0;x<arrayOI.length;x++)
+	{
+		for(var y=0;y<arrayOI[x].length;y++){
+			tableArray[x]+="<td>"+arrayOI[x][y]+"</td>";
+		}
+	}
+}
+
+function displayArrays()
+{
+	var displayData="<table class='arrayDisplay' border='0' cellspacing='0' cellpadding='0'><tr><td>Frame</td>";
+	//add headers to each column
+	displayData+=header;
+	displayData+="</tr>";
+	for(var d=0;d<tableArray.length;d++)
+	{
+		displayData+="<tr><td>"+d+"</td>";
+		displayData+=tableArray[d];
+		displayData+="</tr>";
+	}
+	displayData+="</table>";
+	browseAdj("excelTable").innerHTML=displayData;	
+}
+
+/*
+function displayArrays2(arrayOI)
+{
+	var displayData="<table class='arrayDisplay' border='0' cellspacing='0' cellpadding='0'><tr><td>Frame</td>";
+	for(var c=0;c<arrayOI[0].length;c++)
+	{
+		displayData+="<td>Collisions - botNum "+c+"</td>";
+	}
+	displayData+="</tr>";
+	for(var d=0;d<arrayOI.length;d++)
+	{
+		displayData+="<tr><td>"+d+"</td>";
+		for(var e=0;e<arrayOI[d].length;e++)
+		{
+			displayData+="<td>"+arrayOI[d][e]+"</td>";
+		}
+		displayData+="</tr>";
+	}
+	displayData+="</table>";
+	browseAdj("excelTable").innerHTML=displayData;	
+}
+*/
+
+//this function will generate a string with information on the bots, interactions, and matrix position to recreate SQixel experiments
+function generateSQixelExpStr(e)
+{
+	//STEP - get dimensions of matrix
+	var getMatrixMap="MatrixDimen:::colX="+numBoxX+";rowY="+numRowsY+"%%%";
+	//STEP - BotTypes: record all information about the botTypes.
+	//each botType - |botID=3;botName=Neo;botMovement=0;botColor=rgb(20,34,112);botRise=0;botRun=0;randomizeSlope=1|botID=4...etc.
+	var expStrBotType="AllBotTypes:::";
+	for(var a=0;a<botTypeList.length;a++)
+	{
+		//get information about each aspect of the bot
+		expStrBotType+="botID="+botTypeList[a].botID+";botName="+botTypeList[a].botName+";botMovement="+botTypeList[a].botMovement+";botColor="+botTypeList[a].botColor+";botRise="+botTypeList[a].botRise+";botRun="+botTypeList[a].botRun+";randomizeSlope="+botTypeList[a].randomizeSlope+";counterStat="+botTypeList[a].counterStat+"|";
+	}
+	expStrBotType+="%%%";
+	//STEP - Interactions: insert information about the reactions in this experiment
+	var expStrAllRxns="AllRxns:::"+allInteractionStr+"%%%";	
+	//STEP - Matrix Positions: record information about the position of bots in the matrix
+	//each bot in matrix - |botNum=3;botSpecies=1;botName=Neo;botMovement=0;botActive=1;botPos=544;botColor=rgb(20,34,112);botRise=0;botRun=0;|botNum=4...etc.
+	var expStrMatrixPos="AllMatrixPos:::";
+	
+	for(var b=0;b<botArmy.length;b++)
+	{
+		expStrMatrixPos+="botNum="+botArmy[b].botNum+";botSpecies="+botArmy[b].botSpecies+";botName="+botArmy[b].botName+";botMovement="+botArmy[b].botMovement+";botActive="+botArmy[b].active+";botPos="+botArmy[b].position+";botColor="+botArmy[b].color+";botRise="+botArmy[b].rise+";botRun="+botArmy[b].run+"|";
+	}
+	expStrMatrixPos+="%%%";
+
+	var fullOutputStr=getMatrixMap+""+expStrBotType+""+expStrAllRxns+""+expStrMatrixPos;
+
+	mouseOrig(e);
+	var sqixStrBox="<table class='popUpBox' style='position:absolute;left:"+xOrig+";top:"+yOrig+";z-index:100;background-color:#333333;'>";
+	sqixStrBox+="<tr><td>SQixel Experimental Setup</td><td class='closeX' onclick='closePopUps()'>X</td></tr>";
+	sqixStrBox+="<tr><td colspan='2'><textarea class='textField'>"+fullOutputStr+"</textarea></td></tr></table>";
+	browseAdj("popUpArea").innerHTML=sqixStrBox;
+}
+
+function selectDataLoading(e)
+{
+	//find the specific button
+	var loadStat=isIE ? e.srcElement : e.target;
+	var getLoadVal=parseInt(loadStat.getAttribute("loadVal"));
+	//if button is 0, then change to 1
+	if(getLoadVal==0){
+		loadStat.setAttribute("loadVal",1);
+		loadStat.style.backgroundColor="#28D68B";
+	}
+	else	//else change 1 to 0
+	{
+		loadStat.setAttribute("loadVal",0);
+		loadStat.style.backgroundColor="#AAAAAA";
+	}	
+}
+
+function showSQixelInputForm(e)
+{
+	mouseOrig(e);
+	//sqixIF: sqixel input form
+	var sqixIF="<table class='popUpBox' style='position:absolute;left:"+xOrig+";top:"+yOrig+";z-index:100;background-color:#333333;'>";	
+	sqixIF+="<tr><td>SQixel Experiment Input Form</td><td class='closeX' onclick='closePopUps()'>X</td></tr>";
+	sqixIF+="<tr><td id='sQIFLoadBotType' loadVal='1' colspan='2' class='buttonGray' style='background-color:#28D68B;' onclick='selectDataLoading(event)'>Load Bot Types</td></tr>";
+	sqixIF+="<tr><td id='sQIFLoadRxn' loadVal='1' colspan='2' class='buttonGray' style='background-color:#28D68B;' onclick='selectDataLoading(event)'>Load Interactions</td></tr>";
+	sqixIF+="<tr><td id='sQIFLoadBotArmy' loadVal='1' colspan='2' class='buttonGray' style='background-color:#28D68B;' onclick='selectDataLoading(event)'>Load Bot Army</td></tr>";
+	sqixIF+="<tr><td colspan='2'><textarea id='sQixelInputForm' class='textField'></textarea></td></tr>";
+	sqixIF+="<tr><td colspan='2' class='buttonGray' style='background-color:#5CA4F5;' onclick='readSQixelExpStr();closePopUps()'>Initialize SQixelation</td></tr></table>";
+	browseAdj("popUpArea").innerHTML=sqixIF;
+}
+
+function getSQVal(str)
+{
+	var	getSplit=str.split("=");
+	return getSplit[1];
+}
+
+function readSQixelExpStr()
+{
+	//get SQixel string to read
+	var SES=browseAdj("sQixelInputForm").value;		//SES = SQixel Exp Str
+	//get loading status. gLS = get loading status
+	var gLSBotType=browseAdj("sQIFLoadBotType").getAttribute("loadVal");
+	var gLSRxn=browseAdj("sQIFLoadRxn").getAttribute("loadVal");
+	var gLSBotArmy=browseAdj("sQIFLoadBotArmy").getAttribute("loadVal");
+	//STEP - separate large string into MatrixDimen, botTypes, interactions, & matrix positions using "%%%"
+	var dataTypes=SES.split("%%%");
+	//STEP - recreate matrix dimensions using the numBoxX & numRowsY & calling the generateMatrix function
+	recreateMatrixMap(dataTypes[0]);
+	//STEP - recreate botTypeList Array
+	if(gLSBotType==1){recreateBotTypeList(dataTypes[1]);}
+	//STEP - recreate interaction list simply by assigning string to the AllInteractionStr variable
+	var strIB1=dataTypes[2].split(":::");
+	//reaction recorded to global variable "allInteractionStr"
+	if(gLSRxn==1){allInteractionStr=strIB1[1];}
+	//STEP - recreate positions of bots by, 1) recreating botArmy array, 2)placing bots in respective location 
+	if(gLSBotArmy==1){recreateBotArmy(dataTypes[3]);}
+}
+
+function recreateMatrixMap(getData)
+{
+	var strMM1=getData.split(":::");
+	var strMM2=strMM1[1].split(";");
+	numBoxX=parseInt(getSQVal(strMM2[0]));
+	numRowsY=parseInt(getSQVal(strMM2[1]));
+	generateMatrix(numBoxX,numRowsY);
+}
+
+function recreateBotTypeList(getData)
+{
+	var strBTL3;
+	var temp,setBotID,setName,setMovement,setColor,setRise,setRun,randomizeSlope;
+	//get string of botTypes
+	var strBTL1=getData.split(":::");
+	if(strBTL1[1]!="")
+	{
+		//separate string of botTypes
+		var strBTL2=strBTL1[1].split("|");
+		//add each bot type to its respective spot in the botTypeList array
+		for(var i=0;i<strBTL2.length;i++)
+		{
+			if(strBTL2[i]!="")
+			{
+				strBTL3=strBTL2[i].split(";");
+				//each bot type - |botID=3;botName=Neo;botMovement=0;botColor=rgb(20,34,112);botRise=0;botRun=0;randomizeSlope=1|botID=4...etc.
+				setBotID=getSQVal(strBTL3[0]);
+				setBotID=parseInt(setBotID);
+				setName=getSQVal(strBTL3[1]);
+				setMovement=getSQVal(strBTL3[2]);
+				setColor=getSQVal(strBTL3[3]);
+				setRise=getSQVal(strBTL3[4]);
+				setRun=getSQVal(strBTL3[5]);
+				randomizeSlope=getSQVal(strBTL3[6]);
+				setCounter=getSQVal(strBTL3[7]);
+				//alert("rBTL loop: "+setBotID+" | "+setName+" | "+setMovement+" | "+setColor+" | "+setRise+" | "+setRun+" | "+randomizeSlope);
+				//create botType in array
+				botTypeList[setBotID]=new botType(setBotID,setName,setMovement,setColor,setRise,setRun,randomizeSlope,setCounter);		//(botID,botName,botColor,botRise,botRun)
+			}
+		}
+		botTypeCounter=parseInt(botTypeList.length);		//need the +1 so the next botType that is created is a new botTypeCounter #
+	}
+}
+
+function recreateBotArmy(getData)
+{
+	var getBotTypeID,getPos,getRise,getRun,getActivity;
+	//STEP - recreate botArmy array
+	var strBA1=getData.split(":::");
+	if(strBA1[1]!="")
+	{
+		//separate string of botTypes
+		var strBA2=strBA1[1].split("|");
+		for(var x=0;x<strBA2.length;x++)
+		{
+			if(strBA2[x]!="")
+			{
+				//each bot in matrix - |botNum=3;botSpecies=1;botName=Neo;botMovement=0;botActive=1;botPos=544;botColor=rgb(20,34,112);botRise=0;botRun=0;|botNum=4...etc.
+				strBA3=strBA2[x].split(";");
+				getBotTypeID=getSQVal(strBA3[1]);
+				getActivity=getSQVal(strBA3[4]);
+				getPos=getSQVal(strBA3[5]);
+				getRise=parseInt(getSQVal(strBA3[7]));
+				getRun=parseInt(getSQVal(strBA3[8]));
+				createAndGenBot(getBotTypeID,getPos,getRise,getRun,getActivity);
+			}
+		}
+	}
+}
+
+//ACTION FUNCTION ENDS
+function initialFunctions()
+{
+	//find out the dimensions of window
+	browserSize();
+	//find # of boxes in X direction
+	mPWidth=Math.round(widthOfWindow/numBoxX);		//mP - macropixels. NOTE: numBoxX is a global variable that specifies the # of boxes in 1 row
+	//since I want each box to be a square, the width=height. Thus, height/(width of each box)
+	numRowsY=Math.round(heightOfWindow/mPWidth);
+	//generate matrix of boxes.
+	generateMatrix(numBoxX,numRowsY);
+	//center the matrix of boxes
+	centerMatrix();
+}
+</script>
+</head>
+<body onload="initialFunctions()">
+<span id="popUpArea"></span>
+<table style="position:relative;z-index:10;"><tr>
+<td><span class="pressButton" onclick="displayControlPanel()">Menu</span></td>
+<td>
+<span id="controlPanel" style="display:block;">
+	<span class="pressButton" onclick="startAnimation(1)">Play</span>
+	<span class="pressButton" onclick="startAnimation(0)">Play SloMo</span>
+	<span class="pressButton" onclick="stopButtonClicked()">Stop</span>
+	<span class="pressButton" onclick="getRawData(event)">Raw Data</span>
+	<span class="pressButton" onclick="generateSQixelExpStr(event)">Get SQixel.Exp.Str</span>
+	<span class="pressButton" onclick="showSQixelInputForm(event)">Read SQixel.Exp.Str</span>
+	<span class="pressButton" onclick="setAnalysisParameters(event)">Analysis Parameters</span>
+	<span class="pressButton" onclick="botMenu(event)">Bot Menu</span>
+	<span class="pressButton" onclick="interactionMenu(event)">Interactions</span>
+</span>
+</td>
+<td>
+<div id="dia" style="position:relative;z-index:1;width:600px;height:55px;background-color:#555555;font:10px Rockwell, 'Courier New', Courier, Georgia, serif;overflow:auto;"></div>
+</td>
+<td>
+<div id="counter" style="padding:5px;background-color:#555555;font:8px Rockwell, 'Courier New', Courier, Georgia, serif;"></div>
+</td>
+</tr>
+</table>
+
+<div id="matrixArea" style="position:absolute;left:0;top:0;"></div>
+<br/>
+<div id="testBox"></div>
+<input id="rawData" type="hidden"></input>
+<br/>
+<span id="TESTAREA"></span>
+</body>
+</html>

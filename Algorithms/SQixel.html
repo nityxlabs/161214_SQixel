@@ -1,0 +1,217 @@
+<html>
+<head>
+<title>CosmosNine.</title>
+<link rel="stylesheet" type="text/css" href="CosmosSteelo.css" />
+<script src="jquery.js"></script> 
+<script type="text/javascript">
+var isIE=document.all;
+//mouse movement
+var xOrig=0;
+var yOrig=0;
+
+//browserSize
+var widthOfWindow;	//for window dimensions - width
+var heightOfWindow;	//for window dimensions - height
+
+//for setting up randomly placed people
+var RNOP;		//Random Number of People
+
+//autonomously moving a person
+var movingTimer;
+
+//different types of movements
+var peepsMove=new Array();
+var moveInterval=new Array();
+//movement1()
+var move1=0;
+//movement2
+var move2=0;
+
+//virtual grid
+var vGrid;
+var squareLength;
+//assignLeadersToGridBox
+var allStrRandBox="";
+
+//peopleMovements()
+var globalTimer=0;
+
+function browseAdj(x)
+{
+var object;
+	 if(document.getElementById){	//Mozilla
+                  object=document.getElementById(x);
+            }else if(document.all){		//Internet Explorer
+                  object=document.all[x];
+            }else if(document.layers){		//Netscape
+                  object=document.layers[x];
+            }          
+return object;
+}
+
+function browserSize() {
+	  var myWidth = 0, myHeight = 0;
+	  if( typeof( window.innerWidth ) == 'number' ) {   //Non-IE
+	    myWidth = window.innerWidth;
+	    myHeight = window.innerHeight;
+	    myXScroll = window.pageXOffset;
+	    myYScroll = window.pageYOffset;
+	  } else if(document.documentElement && ( document.documentElement.clientWidth || document.documentElement.clientHeight ) ) {
+	    //IE 6+ in 'standards compliant mode'
+	    myWidth = document.documentElement.clientWidth;
+	    myHeight = document.documentElement.clientHeight;
+	    myXScroll = document.documentElement.scrollLeft;
+	    myYScroll = document.documentElement.scrollTop;
+	  } else if( document.body && ( document.body.clientWidth || document.body.clientHeight ) ) {  //IE 4 compatible
+	    myWidth = document.body.clientWidth;
+	    myHeight = document.body.clientHeight;
+	    myXScroll = document.body.scrollLeft;
+	    myYScroll = document.body.scrollTop;
+	  }
+	  widthOfWindow=myWidth-100;
+	  heightOfWindow=myHeight-100;
+	  currentXScroll=myXScroll;
+	  currentYScroll=myYScroll;
+	  //window.alert( 'Width = ' + myWidth );
+	  //window.alert( 'Height = ' + myHeight );  
+	}
+
+
+function mouseOrig(x)
+{
+	if (browseAdj(x))
+	{
+		xOrig = window.event.x;
+		yOrig = window.event.y;		
+	}
+	else //works for Netscape & Mozilla
+	{
+		xOrig = x.pageX;
+		yOrig = x.pageY;	
+	}
+}
+
+function retrieveNodeArray(NameOfNode,NodeTrait,SpecificTrait)
+{
+	//NameOfNode - access the name attribute of the node
+	//NodeTrait - the attribute of interest for the node (getAttribute)
+	//SpecificTrait - the value the NodeTrait should match
+	//create array
+	var i;
+	var k=0;
+	var ArrayOfNodes=new Array();
+	var e=new Array();
+	var e=document.getElementsByName(NameOfNode);
+	//for(i in e)
+	for(i=0;i<e.length;i++)
+	{
+		if(e[i].getAttribute(NodeTrait)==SpecificTrait)
+		{
+			ArrayOfNodes[k]=e[i];
+			k++;			
+		}
+	}
+	return ArrayOfNodes;
+}
+
+function randomColorGenerator()
+{
+	var colorString;
+	var colorR=Math.floor(Math.random()*255);
+	var colorB=Math.floor(Math.random()*255);
+	var colorG=Math.floor(Math.random()*255);
+	colorString="rgb("+colorR+","+colorB+","+colorG+")";
+	return colorString;
+}
+
+//COSMOS.NINE. Functions start
+function generateMatrix()
+{
+	var matrixArea,numBoxX,mPWidth,numRows,mPCount;
+	//get # of boxes in X & Y axis
+	numBoxX=50;
+	//find out the dimensions of window
+	browserSize();
+	//find # of boxes in X direction
+	mPWidth=Math.round(widthOfWindow/numBoxX);		//mP - macropixels
+	//since I want each box to be a square, the width=height. Thus, height/(width of each box)
+	numRows=Math.round(heightOfWindow/mPWidth);
+	mPCount=0;
+	matrixArea="<table id='matrixContainer' style='position:relative;' border='0' cellspacing='1' cellpadding='0'>";
+	for(y=0;y<numRows;y++)
+	{
+		matrixArea+="<tr>";
+		for(x=0;x<numBoxX;x++)
+		{
+			matrixArea+="<td><div id="+mPCount+" class='macroPixel' style='width:"+mPWidth+";height:"+mPWidth+";' onmouseover='cursorLightOn(event)' onmouseout='cursorLightOff(event)'>&nbsp;</div></td>";
+			mPCount++;
+		}
+		matrixArea+="</tr>";
+	}
+	matrixArea+="</table>";
+	browseAdj("matrixArea").innerHTML=matrixArea;
+}
+
+function centerMatrix()
+{
+	var matrixWidth=browseAdj("matrixContainer").offsetWidth;
+	var matrixHeight=browseAdj("matrixContainer").offsetHeight;
+	var extraSpaceX=Math.abs(widthOfWindow-matrixWidth);
+	var extraSpaceY=Math.abs(heightOfWindow-matrixHeight);
+	var matrixPosX=extraSpaceX/2;
+	var matrixPosY=extraSpaceY/2;
+	browseAdj("matrixContainer").style.left=matrixPosX;
+	browseAdj("matrixContainer").style.top=matrixPosY;
+}
+
+function cursorLightOn(e)
+{
+	var mP=isIE ? e.srcElement : e.target;
+	var getColor=randomColorGenerator();
+	mP.style.backgroundColor=getColor;
+}
+
+function cursorLightOff(e)
+{
+	var mP=isIE ? e.srcElement : e.target;
+	mP.style.backgroundColor="#222222";	
+}
+
+//COSMOS.NINE. Functions end
+
+
+//BOT FUNCTIONS BEGIN
+function Bot(position,func,color,rise,run)
+{
+	this.position=position;
+	this.func=func;
+	this.color=color;
+	//refers to the slope=rise/run
+	this.rise=rise;
+	this.run=run;
+	//other ideas: frame caption, bot mood
+}
+
+function addBot(e)
+{
+	//initiated by a click on a box
+	//add a box to that specific location
+	//each bot has the following information: botID, function, slope
+	var botColor=randomColorGenerator();
+	var 
+}
+
+//BOT FUNCTION ENDS
+function initialFunctions()
+{
+	//generate matrix of boxes.
+	generateMatrix();
+	//center the matrix of boxes
+	centerMatrix();
+}
+</script>
+</head>
+<body onload="initialFunctions()">
+<div id="matrixArea"></div>
+</body>
+</html>

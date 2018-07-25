@@ -1,0 +1,482 @@
+<html>
+<head>
+<title>CosmosNine.</title>
+<link rel="stylesheet" type="text/css" href="CosmosSteelo.css" />
+<script src="jquery.js"></script> 
+<script type="text/javascript">
+var isIE=document.all;
+//mouse movement
+var xOrig=0;
+var yOrig=0;
+
+//browserSize
+var widthOfWindow;	//for window dimensions - width
+var heightOfWindow;	//for window dimensions - height
+
+//for setting up randomly placed people
+var RNOP;		//Random Number of People
+
+//autonomously moving a person
+var movingTimer;
+
+//different types of movements
+var peepsMove=new Array();
+var moveInterval=new Array();
+//movement1()
+var move1=0;
+//movement2
+var move2=0;
+
+//virtual grid
+var vGrid;
+var squareLength;
+//assignLeadersToGridBox
+var allStrRandBox="";
+
+//peopleMovements()
+var globalTimer=0;
+
+function browseAdj(x)
+{
+var object;
+	 if(document.getElementById){	//Mozilla
+                  object=document.getElementById(x);
+            }else if(document.all){		//Internet Explorer
+                  object=document.all[x];
+            }else if(document.layers){		//Netscape
+                  object=document.layers[x];
+            }          
+return object;
+}
+
+function browserSize() {
+	  var myWidth = 0, myHeight = 0;
+	  if( typeof( window.innerWidth ) == 'number' ) {   //Non-IE
+	    myWidth = window.innerWidth;
+	    myHeight = window.innerHeight;
+	    myXScroll = window.pageXOffset;
+	    myYScroll = window.pageYOffset;
+	  } else if(document.documentElement && ( document.documentElement.clientWidth || document.documentElement.clientHeight ) ) {
+	    //IE 6+ in 'standards compliant mode'
+	    myWidth = document.documentElement.clientWidth;
+	    myHeight = document.documentElement.clientHeight;
+	    myXScroll = document.documentElement.scrollLeft;
+	    myYScroll = document.documentElement.scrollTop;
+	  } else if( document.body && ( document.body.clientWidth || document.body.clientHeight ) ) {  //IE 4 compatible
+	    myWidth = document.body.clientWidth;
+	    myHeight = document.body.clientHeight;
+	    myXScroll = document.body.scrollLeft;
+	    myYScroll = document.body.scrollTop;
+	  }
+	  widthOfWindow=myWidth-100;
+	  heightOfWindow=myHeight-100;
+	  currentXScroll=myXScroll;
+	  currentYScroll=myYScroll;
+	  //window.alert( 'Width = ' + myWidth );
+	  //window.alert( 'Height = ' + myHeight );  
+	}
+
+
+function mouseOrig(x)
+{
+	if (browseAdj(x))
+	{
+		xOrig = window.event.x;
+		yOrig = window.event.y;		
+	}
+	else //works for Netscape & Mozilla
+	{
+		xOrig = x.pageX;
+		yOrig = x.pageY;	
+	}
+}
+
+function retrieveNodeArray(NameOfNode,NodeTrait,SpecificTrait)
+{
+	//NameOfNode - access the name attribute of the node
+	//NodeTrait - the attribute of interest for the node (getAttribute)
+	//SpecificTrait - the value the NodeTrait should match
+	//create array
+	var i;
+	var k=0;
+	var ArrayOfNodes=new Array();
+	var e=new Array();
+	var e=document.getElementsByName(NameOfNode);
+	//for(i in e)
+	for(i=0;i<e.length;i++)
+	{
+		if(e[i].getAttribute(NodeTrait)==SpecificTrait)
+		{
+			ArrayOfNodes[k]=e[i];
+			k++;			
+		}
+	}
+	return ArrayOfNodes;
+}
+
+function randomColorGenerator()
+{
+	var colorString;
+	var colorR=Math.floor(Math.random()*255);
+	var colorB=Math.floor(Math.random()*255);
+	var colorG=Math.floor(Math.random()*255);
+	colorString="rgb("+colorR+","+colorB+","+colorG+")";
+	return colorString;
+}
+
+//COSMOS.NINE. Functions start
+function generateMatrix()
+{
+	var matrixArea,numBoxX,mPWidth,numRows,mPCount;
+	//get # of boxes in X & Y axis
+	numBoxX=50;
+	//find out the dimensions of window
+	browserSize();
+	//find # of boxes in X direction
+	mPWidth=Math.floor(widthOfWindow/numBoxX);		//mP - macropixels
+	//since I want each box to be a square, the width=height. Thus, height/(width of each box)
+	numRows=Math.floor(heightOfWindow/mPWidth);
+	mPCount=0;
+	matrixArea="<table border='0' cellspacing='2' cellpadding='0'>";
+	for(y=0;y<numRows;y++)
+	{
+		matrixArea+="<tr>";
+		for(x=0;x<numBoxX;x++)
+		{
+			matrixArea+="<td><div id="+mPCount+" class='macroPixel' style='width:"+mPWidth+";height:"+mPWidth+";' onmouseover='cursorLightOn(event)' onmouseout='cursorLightOff(event)'>&nbsp;</div></td>";
+			mPCount;
+		}
+		matrixArea+="</tr>";
+	}
+	matrixArea+="</table>";
+	browseAdj("matrixArea").innerHTML=matrixArea;
+}
+
+function cursorLightOn(e)
+{
+	var mP=isIE ? e.srcElement : e.target;
+	var getColor=randomColorGenerator();
+	mP.style.backgroundColor=getColor;
+}
+
+function cursorLightOff(e)
+{
+	var mP=isIE ? e.srcElement : e.target;
+	mP.style.backgroundColor="#222222";	
+}
+
+//COSMOS.NINE. Functions end
+
+function randomNumOfPeople()
+{
+	RNOP=Math.floor(Math.random()*100);
+	var i,getColor,personID;
+	var people="";
+	for(i=0;i<RNOP;i++)
+	{
+		getColor=randomColorGenerator();
+		personID="person"+i;
+		people+="<div name='vPerson' id='"+personID+"' genID='"+personID+"' style='position:absolute;left:0;top:0;' onclick='talkTest(event)'><div id='face"+personID+"' genID='"+personID+"' class='personIcon' style='position:relative;top:0;left:0;z-index:1;background-color:"+getColor+";'>"+i+"</div><span id='talk"+personID+"' genID='"+personID+"'></span></div>";
+	}
+	browseAdj("loadPeopleArea").innerHTML=people;
+}
+
+function randomlyPlace()
+{
+	var p,randomX,randomY,personID;
+	browserSize();
+	//randomly generate numbers within size of screen to place person
+	for(p=0;p<RNOP;p++)
+	{
+		personID="person"+p;
+		randomX=Math.random()*widthOfWindow;
+		randomY=Math.random()*heightOfWindow;
+		//position person in random location
+		browseAdj(personID).style.left=randomX;
+		browseAdj(personID).style.top=randomY;
+		//alert("rPLoop"+p+" of "+RNOP);
+	}
+}
+
+function assignBehavior(personID)
+{
+	var testStr=personID+"";
+	var getLeaderNum,followLeaderID,leadStat;
+	//assign as either a leader or follower
+	var leaderDecision=Math.round(Math.random()*10);
+	if(leaderDecision>5){leadStat=1;}
+	else{leadStat=0;}
+	browseAdj(personID).setAttribute("leader",leadStat);
+	testStr+=":"+leadStat;
+	if(leadStat==0){
+		//generate random user that is not itself
+		do{
+		getLeaderNum=Math.round(Math.random()*RNOP);
+		followLeaderID="person"+getLeaderNum;
+		}while(followLeaderID==personID);
+		browseAdj(personID).setAttribute("followLeader",followLeaderID);
+		testStr+=":"+getLeaderNum;
+	}
+	//generate random # for time length of behavior
+	var timeLength=Math.round(Math.random()*10)+10;
+	//generate random # for behavior type
+	//var behaveType=Math.round(Math.random()*1);
+	var behaveType=1;
+	//assign behavior & time to each person
+	browseAdj(personID).setAttribute("behaveTime",timeLength);
+	browseAdj(personID).setAttribute("behaveType",behaveType);
+
+	//evaluate the # of leaders & virtualGrid
+	//if there are more leaders than 
+	/*
+	var facePerson="face"+personID;
+	//browseAdj(facePerson).innerHTML=timeLength+" | "+behaveType;
+	//browseAdj(facePerson).innerHTML=testStr;
+	*/
+}
+
+//create virtual grid
+function createVirtualGrid()
+{
+	var leaderNum,N,randBox,strRandBox,allStrRandBox;
+	allStrRandBox="*";
+	var leaders=new Array();
+	browserSize();
+	/*
+	//find the # of leaders
+	leaders=retrieveNodeArray("vPerson","leader","1");
+	//create appropriate # of grids = 4^N
+	leaderNum=leaders.length;
+	*/
+	N=0;
+	do{
+		N++;
+	}while((Math.pow(4,N))<RNOP);
+	vGrid=Math.pow(4,N);
+	squareLength=Math.sqrt(vGrid);
+
+	/*
+	//draw grid
+	var marker,xPos,yPos,boxWidth,boxHeight;
+	boxWidth=widthOfWindow/squareLength;
+	boxHeight=heightOfWindow/squareLength;
+	marker="";
+	for(a=0;a<vGrid;a++)
+	{
+		//column
+		xPos=boxWidth*(a%squareLength);
+		//row
+		yPos=boxHeight*Math.floor(a/squareLength);
+		//create marker
+		marker+="<span style='position:absolute;left:"+xPos+";top:"+yPos+";color:#EEEEEE;'>"+a+"</span>";
+	}
+	browseAdj("testGrid").innerHTML=marker;
+	*/
+}
+
+function removeGridBoxLoc(leader)
+{
+	var gridLoc,iStr,endStr,newAllStrRandBox;
+	//get gridbox string from leader
+	gridLoc="*";
+	gridLoc+=leader.getAttribute("gridBox")+"*";
+	//remove the leader's grid position from allStrRandBox
+	iStr=allStrRandBox.indexOf(gridLoc)+1;
+	newAllStrRandBox=allStrRandBox.substr(0,iStr);
+	endStr=allStrRandBox.indexOf(gridLoc)+gridLoc.length;
+	newAllStrRandBox+=allStrRandBox.substr(endStr);
+	//assign new string to original allStrRandBox
+	allStrRandBox=newAllStrRandBox;
+}
+
+function resetVirtualGrid()
+{
+	allStrRandBox="";
+}
+
+function assignAllLeadersToGridBox()
+{
+	var leaders=new Array();
+	//find the # of leaders
+	leaders=retrieveNodeArray("vPerson","leader","1");
+	//assign box location on grid
+	for(i=0;i<leaders.length;i++)
+	{
+		assignLeadersToGridBox(leaders[i]);
+		//assignLeadersToGridBox(leaders[a].getAttribute("id"));
+	}
+}
+
+function assignLeadersToGridBox(leaderOI)
+{
+	var randBox,strRandBox;
+	randBox=Math.round(Math.random()*vGrid);
+	strRandBox="*"+randBox+"*";
+	var j=0;
+	while(allStrRandBox.indexOf(strRandBox)!=-1)
+	{
+		j++;
+		randBox=Math.round(Math.random()*vGrid);
+		strRandBox="*"+randBox+"*";
+	}
+	allStrRandBox+=randBox+"*";
+	leaderOI.setAttribute("gridBox",randBox);
+	leaderOI.childNodes[0].innerHTML="rB: "+randBox;
+}
+
+function peopleMovements()
+{
+	var personID,getTimer,leaderStat,getBehavior,x1,x2,y1,y2,newX,newY,xMove,yMove,jQID,talkID,jQIDtalk,talkID2,jQIDtalk2;
+	maxMove=30;
+	browserSize();
+	globalTimer++;
+	browseAdj("globalCounter").innerHTML=globalTimer;
+	for(i=0;i<RNOP;i++)
+	{
+		personID="person"+i;
+		//check timer
+		getTimer=browseAdj(personID).getAttribute("behaveTime");
+		//if timer is up, then switch behavior
+		if((globalTimer%getTimer)==0)
+		{
+			//if person was a leader, then remove it from the allStrRandBox
+			if((browseAdj(personID).getAttribute("leader"))==1){removeGridBoxLoc(browseAdj(personID));}
+			assignBehavior(personID);
+			if((browseAdj(personID).getAttribute("leader"))==1){assignLeadersToGridBox(browseAdj(personID));}
+			/*
+			resetVirtualGrid();
+			assignBehavior(personID);
+			createVirtualGrid();
+			*/
+		}
+		else 	//else proceed with behavior type
+		{
+			leaderStat=browseAdj(personID).getAttribute("leader");
+			//leadToFP=browseAdj(personID).getAttribute("leadToFinalPoint");
+			if(leaderStat==1){		//if the person is a leader
+			//get grid box #
+			gridBoxNum=parseInt(browseAdj(personID).getAttribute("gridBox"));
+			widthOfBox=widthOfWindow/squareLength;
+			heightOfBox=heightOfWindow/squareLength;
+			//get behavior type
+			getBehavior=browseAdj(personID).getAttribute("behaveType");
+			x1=parseInt(browseAdj(personID).style.left);
+			y1=parseInt(browseAdj(personID).style.top);
+			x2=widthOfBox*(gridBoxNum%squareLength);
+			y2=heightOfBox*Math.floor(gridBoxNum/squareLength);
+			//y2=(gridBoxNum-Math.floor(gridBoxNum/(Math.sqrt(vGrid)))*(Math.sqrt(vGrid)))*heightOfBox;
+			imperfectX=(Math.random()*7)-(Math.random()*7);
+			imperfectY=(Math.random()*7)-(Math.random()*7);
+			newX=x2-x1+imperfectX;
+			newY=y2-y1+imperfectY;
+			
+			xMove="+="+newX;
+			yMove="+="+newY;
+			$(function(event){
+				jQID="#"+personID;
+				$(jQID).animate({left:xMove,top:yMove});
+			});
+			//browseAdj(personID).setAttribute("leadToFinalPoint","1");
+			}
+			else		//if the person is a follower
+			{
+				var getLeader,leaderX,leaderY,followerX,followerY,vecX,vecY,pythag,ranDivide,bufferMove,vecX2,vecY2,jQFollowerID;
+				//find position of leader
+				getLeader=browseAdj(personID).getAttribute("followLeader");
+				leaderX=parseInt(browseAdj(getLeader).style.left);
+				leaderY=parseInt(browseAdj(getLeader).style.top);
+				//find position of follower
+				followerX=parseInt(browseAdj(personID).style.left);
+				followerY=parseInt(browseAdj(personID).style.top);
+				//find vector pointing from follower to leader
+				vecX=leaderX-followerX;
+				vecY=leaderY-followerY;
+				//minimize this movement
+				pythag=Math.sqrt(vecX*vecX+vecY*vecY)/5;		//divided by 5 so that ranDivide would be a smaller # (thus people can move much farther)	
+				ranDivide=Math.round(Math.random()*pythag)+5;
+				bufferMove=Math.round((Math.random()*2)-(Math.random()*2));
+				vecX=(vecX/pythag)*(pythag/10)+bufferMove;						//added bufferMove so that people would move around person rather than be right on top of person
+				vecY=(vecY/pythag)*(pythag/10)+bufferMove;
+				vecX2="+="+vecX;
+				vecY2="+="+vecY;
+				$(function(event){
+					jQFollowerID="#"+personID;
+					$(jQFollowerID).animate({left:vecX2,top:vecY2});
+				});
+			}
+		}
+	}
+}
+
+function talkTest(e)
+{
+	var person=isIE ? e.srcElement : e.target;
+	var personID=person.getAttribute("genID");
+	var talkID="talk"+personID;
+	var talkID2="talk2"+personID;
+	var jQIDtalk="#"+talkID;
+	var jQIDtalk2="#"+talkID2;
+	//insert quote in hey box
+	if(browseAdj(talkID2)!=null)
+	{
+		//browseAdj(talkID).innerHTML="";
+		$(function(event){
+			$(jQIDtalk2).animate({opacity:0,top:"+=30"}, function(){browseAdj(talkID).innerHTML="";});
+		});
+	}
+	else
+	{
+		browseAdj(talkID).innerHTML="<span id='"+talkID2+"' class='talkBox' style='float:left;position:relative;top:-10px;z-index:5;opacity:0;'>Hey!</span>";
+		$(function(event){
+			$(jQIDtalk2).animate({opacity:1,top:"-=30"});
+		});
+	}
+}
+
+function movements()
+{
+	var i,selectRandomMove,xMove,yMove,randomX,randomY,currPosX,currPosY,maxMove;
+	var personID,jQID;
+	maxMove=30;
+	browserSize();
+	for(i=0;i<RNOP;i++)
+	{
+		personID="person"+i;
+		selectRandomMove=Math.floor(Math.random()*3);
+		//generate random positions to move to
+		newX=Math.random()*maxMove;
+		newY=Math.random()*maxMove;
+		
+		if(selectRandomMove==0){xMove="+="+newX;yMove="+=0";}
+		else if(selectRandomMove==1){xMove="+=0";yMove="+="+newY;}
+		else if(selectRandomMove==2){xMove="+="+newX;yMove="+="+newY;}
+		else if(selectRandomMove==3){xMove="+=0";yMove="+=0";}
+		$(function(event){
+			jQID="#"+personID;
+			$(jQID).animate({left:xMove,top:yMove});	
+		});
+	}
+}
+
+function restartMovePeople()
+{
+	movingTimer=setInterval('peopleMovements()',1000);
+}
+
+function stopPerson()
+{
+	var a;
+	clearInterval(movingTimer);
+	for(a=0;a<moveInterval.length;a++){clearInterval(moveInterval[a]);}
+}
+
+function initialFunctions()
+{
+	generateMatrix();
+}
+</script>
+</head>
+<body onload="initialFunctions()">
+<div id="matrixArea"></div>
+</body>
+</html>
